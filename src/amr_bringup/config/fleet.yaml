@@ -33,8 +33,11 @@
 # =============================================================================
 
 fleet:
-  # Resolved relative to this file.
-  model_library: "../../amr_description/config/robot_models.yaml"
+  # A package:// URI, resolved through the ament index. NOT a relative path: a
+  # relative hop out of install/amr_bringup/share/amr_bringup/config/ lands in
+  # install/amr_bringup/share/, not in amr_description's install prefix, so a
+  # relative path works from the source tree and breaks once installed.
+  model_library: "package://amr_description/config/robot_models.yaml"
 
   # The frame all plans, trajectories and the merged map share.
   global_frame: "map"

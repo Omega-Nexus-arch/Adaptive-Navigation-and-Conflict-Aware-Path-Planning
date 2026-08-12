@@ -23,7 +23,8 @@ sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 
 from amr_bringup.fleet_loader import (  # noqa: E402
-    FleetConfigError, load_fleet, load_model_library, nav2_substitutions)
+    FleetConfigError, load_fleet, load_model_library, nav2_substitutions,
+    resolve_library_path, resolve_package_uri)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_DIR = os.path.join(HERE, os.pardir, 'config')
@@ -181,9 +182,99 @@ def test_a_missing_model_library_is_rejected(tmp_path):
         load_fleet(str(path))
 
 
+# ---------------------------------------------------------------------------
+# Model-library path resolution
+#
+# The shipped rosters reference the model library with a package:// URI. They
+# originally used a *relative* path, which worked from the source tree and broke
+# the moment the workspace was installed: a relative hop out of
+# install/amr_bringup/share/amr_bringup/config/ lands in
+# install/amr_bringup/share/, not in amr_description's install prefix. These
+# tests exist so that regression cannot come back quietly.
+# ---------------------------------------------------------------------------
+
+
+def test_the_shipped_rosters_use_a_package_uri_not_a_relative_path():
+    """A relative path here works in the source tree and fails once installed."""
+    for name in ('fleet.yaml', 'fleet_ten_robots.yaml'):
+        with open(config(name), 'r', encoding='utf-8') as handle:
+            raw = yaml.safe_load(handle)['fleet']['model_library']
+        assert raw.startswith('package://'), (
+            f'{name} references its model library as {raw!r}; a relative path '
+            f'resolves differently in the install space')
+
+
+def test_package_uris_resolve_via_the_ament_index(tmp_path, monkeypatch=None):
+    """A package:// URI must resolve through AMENT_PREFIX_PATH."""
+    # Build a fake install prefix: <prefix>/share/<pkg>/<file>
+    share = tmp_path / 'share' / 'fake_pkg' / 'config'
+    share.mkdir(parents=True)
+    target = share / 'models.yaml'
+    target.write_text('x: 1')
+
+    previous = os.environ.get('AMENT_PREFIX_PATH', '')
+    os.environ['AMENT_PREFIX_PATH'] = str(tmp_path)
+    try:
+        resolved = resolve_package_uri('package://fake_pkg/config/models.yaml')
+        assert resolved is not None
+        assert os.path.isfile(resolved)
+        assert os.path.samefile(resolved, target)
+    finally:
+        os.environ['AMENT_PREFIX_PATH'] = previous
+
+
+def test_a_non_package_path_is_left_to_the_other_forms():
+    assert resolve_package_uri('/abs/path.yaml') is None
+    assert resolve_package_uri('relative.yaml') is None
+
+
+def test_a_package_uri_falls_back_to_the_source_tree():
+    """Loadable from a checkout with nothing built or sourced.
+
+    Without this the unit tests would depend on a sourced workspace, and anyone
+    reading the repository could not run the loader before building.
+    """
+    previous = os.environ.get('AMENT_PREFIX_PATH', '')
+    os.environ['AMENT_PREFIX_PATH'] = ''
+    try:
+        resolved = resolve_package_uri(
+            'package://amr_description/config/robot_models.yaml',
+            anchor_file=config('fleet.yaml'))
+        assert resolved is not None and os.path.isfile(resolved)
+        assert os.path.samefile(resolved, MODELS)
+    finally:
+        os.environ['AMENT_PREFIX_PATH'] = previous
+
+
+def test_a_malformed_package_uri_is_rejected():
+    with pytest.raises(FleetConfigError, match='malformed package URI'):
+        resolve_package_uri('package://no_slash_here')
+
+
+def test_an_unresolvable_package_uri_explains_both_lookups():
+    previous = os.environ.get('AMENT_PREFIX_PATH', '')
+    os.environ['AMENT_PREFIX_PATH'] = ''
+    try:
+        with pytest.raises(FleetConfigError, match='definitely_not_a_package'):
+            resolve_package_uri('package://definitely_not_a_package/x.yaml',
+                                anchor_file=config('fleet.yaml'))
+    finally:
+        os.environ['AMENT_PREFIX_PATH'] = previous
+
+
+def test_absolute_paths_are_used_verbatim():
+    assert resolve_library_path('/anywhere/fleet.yaml', MODELS) == MODELS
+
+
+def test_relative_paths_resolve_against_the_referring_file():
+    """The form the test fixtures rely on, kept working."""
+    anchor = os.path.join(os.path.dirname(MODELS), 'anchor.yaml')
+    assert resolve_library_path(anchor, 'robot_models.yaml') == MODELS
+
+
 def test_the_model_library_path_resolves_relative_to_the_roster():
-    # The shipped roster uses a relative path, so loading must not depend on
-    # the working directory.
+    # However it is written, loading must not depend on the working directory
+    # and must land on a real file.
     fleet = load_fleet(config('fleet.yaml'))
     assert os.path.isabs(fleet['model_library_path'])
     assert os.path.isfile(fleet['model_library_path'])
@@ -208,10 +299,6 @@ def test_nav2_substitutions_come_from_the_model_library():
     heavy = nav2_substitutions(by_name['amr1'], 'map', '/tmp/elevation.yaml')
     light = nav2_substitutions(by_name['amr2'], 'map', '/tmp/elevation.yaml')
 
-    assert heavy['robot_base_frame'] == 'amr1/base_footprint'
-    assert light['robot_base_frame'] == 'amr2/base_footprint'
-    assert heavy['odom_topic'] == '/amr1/odom'
-
     # The values must match the library rather than being independently typed.
     assert float(heavy['max_vel_x']) == \
         by_name['amr1']['model_properties']['max_vel_x']
@@ -224,6 +311,22 @@ def test_nav2_substitutions_come_from_the_model_library():
     assert float(heavy['max_vel_x']) < float(light['max_vel_x'])
     assert float(heavy['acc_lim_x']) < float(light['acc_lim_x'])
     assert float(heavy['robot_radius']) > float(light['robot_radius'])
+
+
+def test_frames_are_deliberately_absent_from_the_key_rewrites():
+    """Frames must not be rewritten by key name.
+
+    RewrittenYaml replaces every occurrence of a key with one value, but
+    `global_frame` is `map` in the global costmap and `<ns>/odom` in the local
+    one. Including it here would silently anchor the rolling local costmap to
+    the map frame. Frames go through `<ns>` placeholders instead.
+    """
+    fleet = load_fleet(config('fleet.yaml'))
+    subs = nav2_substitutions(fleet['robots'][0], 'map', '/tmp/elevation.yaml')
+    for key in ('global_frame', 'robot_base_frame', 'odom_topic', 'local_frame'):
+        assert key not in subs, (
+            f"'{key}' is a frame and must not be a blanket key rewrite; "
+            f"use a <ns> placeholder in nav2_params.yaml instead")
 
 
 def test_deceleration_limits_are_negative():
@@ -242,6 +345,106 @@ def test_inflation_radius_exceeds_the_footprint():
     for robot in fleet['robots']:
         subs = nav2_substitutions(robot, 'map', '/tmp/elevation.yaml')
         assert float(subs['inflation_radius']) > float(subs['robot_radius'])
+
+
+def _expand_nav2_params(robot, fleet):
+    """Reproduce the two-stage substitution navigation.launch.py performs."""
+    def rewrite(node, subs):
+        # Mimics nav2_common RewrittenYaml: match by key name, recursively.
+        if isinstance(node, dict):
+            return {k: (subs[k] if k in subs else rewrite(v, subs))
+                    for k, v in node.items()}
+        if isinstance(node, list):
+            return [rewrite(v, subs) for v in node]
+        return node
+
+    subs = nav2_substitutions(robot, fleet['global_frame'], '/opt/elev.yaml')
+    with open(config('nav2_params.yaml'), 'r', encoding='utf-8') as handle:
+        text = handle.read().replace('<ns>', robot['name'])
+    return rewrite(yaml.safe_load(text), subs)
+
+
+def test_no_ns_placeholder_survives_expansion():
+    fleet = load_fleet(config('fleet.yaml'))
+    for robot in fleet['robots']:
+        dumped = yaml.dump(_expand_nav2_params(robot, fleet))
+        assert '<ns>' in open(config('nav2_params.yaml')).read(), \
+            'the template should still contain placeholders'
+        assert '<ns>' not in dumped, \
+            f"unsubstituted <ns> left in {robot['name']}'s parameters"
+
+
+def test_the_rolling_local_costmap_stays_anchored_to_odom():
+    """The bug a key-based rewrite silently introduces.
+
+    RewrittenYaml matches on key name, so a single `global_frame` rewrite sets
+    *every* occurrence to the same value -- anchoring the rolling local costmap
+    to `map`, where it lurches on each SLAM correction. Frames therefore go
+    through `<ns>` placeholders, which keep their per-section values.
+    """
+    fleet = load_fleet(config('fleet.yaml'))
+    for robot in fleet['robots']:
+        params = _expand_nav2_params(robot, fleet)
+        name = robot['name']
+
+        local = params['local_costmap']['local_costmap']['ros__parameters']
+        assert local['global_frame'] == f'{name}/odom', \
+            f"local costmap anchored to {local['global_frame']}, not {name}/odom"
+        assert local['rolling_window'] is True
+
+        glob = params['global_costmap']['global_costmap']['ros__parameters']
+        assert glob['global_frame'] == 'map', \
+            'the global costmap must stay in the shared map frame'
+
+
+def test_every_frame_is_namespace_prefixed():
+    """An unprefixed frame does not resolve in a namespaced TF tree."""
+    fleet = load_fleet(config('fleet.yaml'))
+    for robot in fleet['robots']:
+        params = _expand_nav2_params(robot, fleet)
+        name = robot['name']
+
+        expected = {
+            ('bt_navigator', 'robot_base_frame'): f'{name}/base_footprint',
+            ('bt_navigator', 'odom_topic'): f'/{name}/odom',
+            ('behavior_server', 'local_frame'): f'{name}/odom',
+            ('behavior_server', 'robot_base_frame'): f'{name}/base_footprint',
+        }
+        for (section, key), want in expected.items():
+            got = params[section]['ros__parameters'][key]
+            assert got == want, f'{section}.{key} is {got!r}, expected {want!r}'
+
+        for costmap in ('local_costmap', 'global_costmap'):
+            got = params[costmap][costmap]['ros__parameters']['robot_base_frame']
+            assert got == f'{name}/base_footprint', f'{costmap}: {got}'
+
+
+def test_per_model_values_survive_the_expansion():
+    """The heterogeneity must still be there once nav2 has its parameters."""
+    fleet = load_fleet(config('fleet.yaml'))
+    by_name = {r['name']: _expand_nav2_params(r, fleet) for r in fleet['robots']}
+
+    def follow(name, key):
+        return float(by_name[name]['controller_server']['ros__parameters']
+                     ['FollowPath'][key])
+
+    assert follow('amr1', 'max_vel_x') < follow('amr2', 'max_vel_x')
+    assert follow('amr1', 'acc_lim_x') < follow('amr2', 'acc_lim_x')
+    assert follow('amr1', 'decel_lim_x') < 0.0
+
+    heavy = by_name['amr1']['global_costmap']['global_costmap']['ros__parameters']
+    light = by_name['amr2']['global_costmap']['global_costmap']['ros__parameters']
+    assert float(heavy['robot_radius']) > float(light['robot_radius'])
+
+
+def test_the_fleet_layer_knows_which_robot_it_is():
+    """Without this the robot treats its own predicted path as an obstacle."""
+    fleet = load_fleet(config('fleet.yaml'))
+    for robot in fleet['robots']:
+        params = _expand_nav2_params(robot, fleet)
+        layer = (params['local_costmap']['local_costmap']['ros__parameters']
+                 ['fleet_layer'])
+        assert layer['robot_name'] == robot['name']
 
 
 def test_every_robot_gets_its_own_elevation_and_slope_limit():

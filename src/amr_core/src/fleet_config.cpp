@@ -3,7 +3,10 @@
 
 #include "amr_core/fleet_config.hpp"
 
+#include <cstdlib>
+#include <fstream>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -44,12 +47,119 @@ T Required(const YAML::Node & node, const std::string & key, const std::string &
   }
 }
 
-/// \brief Resolve \p path relative to the directory holding \p anchor_file.
-///
-/// Lets `fleet.yaml` say `model_library: ../amr_description/config/...` and
-/// still work from any working directory.
-std::string ResolveRelative(const std::string & anchor_file, const std::string & path)
+bool FileExists(const std::string & path)
 {
+  std::ifstream probe(path);
+  return probe.good();
+}
+
+/// \brief Walk up from \p anchor_file looking for a sibling `<pkg>/<relative>`.
+///
+/// Lets a `package://` reference resolve straight from a source checkout with
+/// nothing built or sourced, which is what keeps the unit tests independent of
+/// a ROS installation.
+std::string FindInSourceTree(
+  const std::string & anchor_file, const std::string & package, const std::string & relative)
+{
+  std::size_t slash = anchor_file.find_last_of('/');
+  if (slash == std::string::npos) {
+    return {};
+  }
+  std::string directory = anchor_file.substr(0, slash);
+  while (!directory.empty()) {
+    const std::string candidate = directory + "/" + package + "/" + relative;
+    if (FileExists(candidate)) {
+      return candidate;
+    }
+    slash = directory.find_last_of('/');
+    if (slash == std::string::npos || slash == 0) {
+      return {};
+    }
+    directory = directory.substr(0, slash);
+  }
+  return {};
+}
+
+/// \brief Resolve a `package://<pkg>/<relative>` URI to an absolute path.
+///
+/// Two lookups, in order:
+///
+///   1. **The ament index**, by scanning `AMENT_PREFIX_PATH` for
+///      `<prefix>/share/<pkg>/<relative>`. This is the install space, and it is
+///      what runs in production. The scan is what
+///      `ament_index_cpp::get_package_share_directory` does; reimplementing it
+///      in ten lines keeps `amr_core` free of ROS dependencies, which is what
+///      lets its 27 tests run without a ROS installation.
+///   2. **The surrounding source tree**, walking up from \p anchor_file.
+///
+/// Both matter. Without (1) the config cannot work once installed; without (2)
+/// it cannot load from an unbuilt checkout.
+///
+/// Returns an empty string when neither lookup succeeds, so the caller can
+/// report which places were searched rather than a bare "file not found".
+std::string ResolvePackageUri(const std::string & uri, const std::string & anchor_file)
+{
+  static const std::string kScheme = "package://";
+  if (uri.compare(0, kScheme.size(), kScheme) != 0) {
+    return {};
+  }
+  const std::string remainder = uri.substr(kScheme.size());
+  const std::size_t slash = remainder.find('/');
+  if (slash == std::string::npos) {
+    return {};
+  }
+  const std::string package = remainder.substr(0, slash);
+  const std::string relative = remainder.substr(slash + 1);
+
+  // 1. Install space.
+  const char * prefix_path = std::getenv("AMENT_PREFIX_PATH");
+  if (prefix_path != nullptr) {
+    std::istringstream stream(prefix_path);
+    std::string prefix;
+    while (std::getline(stream, prefix, ':')) {
+      if (prefix.empty()) {
+        continue;
+      }
+      const std::string candidate = prefix + "/share/" + package + "/" + relative;
+      if (FileExists(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  // 2. Source tree.
+  return FindInSourceTree(anchor_file, package, relative);
+}
+
+/// \brief Resolve a model-library reference to an absolute path.
+///
+/// Three accepted forms, in precedence order:
+///
+///   1. `package://amr_description/config/robot_models.yaml` -- resolved
+///      through AMENT_PREFIX_PATH. **This is the form the shipped configs
+///      use**, because it is the only one that works in both the source tree
+///      and the install space.
+///   2. an absolute path -- used verbatim.
+///   3. a path relative to the referring file -- convenient for the test
+///      fixtures, which sit beside their model library.
+///
+/// Form 3 used to be what `fleet.yaml` shipped with, and it was wrong: a
+/// relative hop out of `install/amr_bringup/share/amr_bringup/config/` lands in
+/// `install/amr_bringup/share/`, not in `amr_description`'s install prefix. It
+/// worked from the source tree and failed the moment the workspace was
+/// installed, which is the worst way for a path bug to behave.
+std::string ResolveLibraryPath(const std::string & anchor_file, const std::string & path)
+{
+  if (path.compare(0, 10, "package://") == 0) {
+    const std::string resolved = ResolvePackageUri(path, anchor_file);
+    if (resolved.empty()) {
+      throw ConfigError(
+              "cannot resolve '" + path + "'. Searched AMENT_PREFIX_PATH (is the "
+              "package built and the workspace sourced?) and the source tree above '" +
+              anchor_file + "'.");
+    }
+    return resolved;
+  }
   if (path.empty() || path.front() == '/') {
     return path;
   }
@@ -209,7 +319,7 @@ FleetConfig FleetConfig::FromFile(const std::string & yaml_path)
   }
 
   const std::string library_path =
-    ResolveRelative(yaml_path, fleet["model_library"].as<std::string>());
+    ResolveLibraryPath(yaml_path, fleet["model_library"].as<std::string>());
   return FromFile(yaml_path, ModelLibrary::FromFile(library_path));
 }
 

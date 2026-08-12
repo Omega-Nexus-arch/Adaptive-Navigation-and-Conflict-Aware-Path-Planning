@@ -50,8 +50,28 @@ def _navigation_nodes(context, *args, **kwargs):
 
     substitutions = nav2_substitutions(matches[0], fleet['global_frame'], elevation_map)
 
+    # Two-stage substitution; see the header of nav2_params.yaml for why.
+    #
+    # Stage 1 - frames, textually. Each `<ns>` keeps whatever value its own line
+    # carries, so the global costmap stays anchored to `map` while the rolling
+    # local costmap gets `<robot>/odom`. RewrittenYaml cannot express this: it
+    # matches on key name, so one `global_frame` rewrite would hit both.
+    template = os.path.join(bringup_share, 'config', 'nav2_params.yaml')
+    with open(template, 'r', encoding='utf-8') as handle:
+        expanded = handle.read().replace('<ns>', robot_name)
+
+    # Written next to the other build artefacts rather than /tmp so the exact
+    # parameters a robot was launched with can be inspected after the fact.
+    scratch = os.path.join(
+        os.environ.get('ROS_HOME', os.path.expanduser('~/.ros')), 'amr_bringup')
+    os.makedirs(scratch, exist_ok=True)
+    expanded_path = os.path.join(scratch, f'nav2_params_{robot_name}.yaml')
+    with open(expanded_path, 'w', encoding='utf-8') as handle:
+        handle.write(expanded)
+
+    # Stage 2 - the values that genuinely are uniform wherever they appear.
     configured_params = RewrittenYaml(
-        source_file=os.path.join(bringup_share, 'config', 'nav2_params.yaml'),
+        source_file=expanded_path,
         root_key=robot_name,
         param_rewrites=substitutions,
         convert_types=True,

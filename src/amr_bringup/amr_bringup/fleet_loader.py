@@ -31,6 +31,104 @@ def _unwrap(document):
     return node
 
 
+def _find_in_source_tree(anchor_file, package, relative):
+    """Walk up from ``anchor_file`` looking for a sibling ``<package>/<relative>``.
+
+    Lets the config load straight from a source checkout with nothing sourced --
+    which is what makes the loader usable from a unit test, and what lets someone
+    reading the repository run it without building first.
+    """
+    directory = os.path.dirname(os.path.abspath(anchor_file))
+    while True:
+        candidate = os.path.join(directory, package, relative)
+        if os.path.isfile(candidate):
+            return candidate
+        parent = os.path.dirname(directory)
+        if parent == directory:
+            return None
+        directory = parent
+
+
+def resolve_package_uri(uri, anchor_file=None):
+    """Resolve ``package://<pkg>/<relative>`` to an absolute path.
+
+    Two lookups, in order:
+
+    1. **The ament index** (``AMENT_PREFIX_PATH``) -- the install space. This is
+       what runs when the workspace is sourced, i.e. in production.
+    2. **The surrounding source tree** -- walk up from ``anchor_file`` looking
+       for a sibling package directory.
+
+    Both are needed. Without (1) the config cannot work once installed; without
+    (2) it cannot be loaded from a checkout that has not been built, which would
+    make the unit tests depend on a sourced workspace.
+
+    Returns None when the scheme does not match, so callers fall through to the
+    absolute/relative forms.
+    """
+    prefix = 'package://'
+    if not uri.startswith(prefix):
+        return None
+    remainder = uri[len(prefix):]
+    if '/' not in remainder:
+        raise FleetConfigError(
+            f"malformed package URI '{uri}': expected package://<pkg>/<path>")
+    package, relative = remainder.split('/', 1)
+
+    # 1. Install space, via the ament index.
+    try:
+        from ament_index_python.packages import get_package_share_directory
+        candidate = os.path.join(get_package_share_directory(package), relative)
+        if os.path.isfile(candidate):
+            return candidate
+    except Exception:                                        # noqa: BLE001
+        pass
+    for entry in os.environ.get('AMENT_PREFIX_PATH', '').split(':'):
+        if not entry:
+            continue
+        candidate = os.path.join(entry, 'share', package, relative)
+        if os.path.isfile(candidate):
+            return candidate
+
+    # 2. Source tree.
+    if anchor_file is not None:
+        candidate = _find_in_source_tree(anchor_file, package, relative)
+        if candidate is not None:
+            return candidate
+
+    raise FleetConfigError(
+        f"cannot resolve '{uri}'. Looked in AMENT_PREFIX_PATH (is {package} built "
+        f"and the workspace sourced?) and in the source tree above "
+        f"{anchor_file or '<no anchor given>'}.")
+
+
+def resolve_library_path(anchor_file, path):
+    """Resolve a model-library reference to an absolute path.
+
+    Three accepted forms, in precedence order:
+
+    1. ``package://amr_description/config/robot_models.yaml`` -- resolved via
+       the ament index. **This is the form the shipped configs use**, because it
+       is the only one that works in both the source tree and the install space.
+    2. an absolute path -- used verbatim.
+    3. a path relative to the referring file -- convenient for test fixtures
+       that sit beside their model library.
+
+    Form 3 is what ``fleet.yaml`` originally shipped with, and it was wrong: a
+    relative hop out of ``install/amr_bringup/share/amr_bringup/config/`` lands
+    in ``install/amr_bringup/share/``, not in ``amr_description``'s install
+    prefix. It worked from the source tree and broke the moment the workspace
+    was installed.
+    """
+    resolved = resolve_package_uri(path, anchor_file)
+    if resolved is not None:
+        return resolved
+    if os.path.isabs(path):
+        return path
+    return os.path.normpath(
+        os.path.join(os.path.dirname(os.path.abspath(anchor_file)), path))
+
+
 def load_model_library(path):
     """Load ``robot_models.yaml`` and return {model_name: properties}."""
     if not os.path.isfile(path):
@@ -61,9 +159,7 @@ def load_fleet(path):
     library_path = fleet.get('model_library')
     if not library_path:
         raise FleetConfigError(f"{path}: needs a `model_library:` path")
-    if not os.path.isabs(library_path):
-        library_path = os.path.normpath(
-            os.path.join(os.path.dirname(os.path.abspath(path)), library_path))
+    library_path = resolve_library_path(path, library_path)
     models = load_model_library(library_path)
 
     seen_names = set()
@@ -133,15 +229,27 @@ def nav2_substitutions(robot, global_frame, elevation_map_path):
     footprint_radius = float(model['footprint_radius'])
     inscribed = float(model.get('inscribed_radius', footprint_radius * 0.6))
 
+    # NOTE ON WHAT IS *NOT* HERE.
+    #
+    # No frame names. RewrittenYaml rewrites by key name, replacing every
+    # occurrence in the file with one value -- which is fine for a radius and
+    # wrong for a frame. `global_frame` is `map` in the global costmap and
+    # `<ns>/odom` in the rolling local costmap; a blanket rewrite would anchor
+    # the local costmap to the map frame and make it lurch on every SLAM
+    # correction. `local_frame` in behavior_server has no counterpart elsewhere
+    # and would simply never be rewritten, leaving an unprefixed `odom` that
+    # does not resolve for a namespaced robot.
+    #
+    # Frames therefore use `<ns>` placeholders substituted textually in
+    # navigation.launch.py, where each occurrence keeps its own value.
+    #
     # The controller is given the model's *acceleration* ceiling directly. The
     # jerk limit is not expressed here because nav2's controllers have no
     # concept of jerk; that is precisely why the custom velocity smoother sits
     # downstream of the controller rather than being configured into it.
+    del global_frame, prefix   # Frames go through <ns>, not through here.
     return {
         'use_sim_time': 'True',
-        'global_frame': global_frame,
-        'robot_base_frame': f"{prefix}base_footprint",
-        'odom_topic': f"/{name}/odom",
         'robot_radius': str(footprint_radius),
         'inflation_radius': str(round(footprint_radius + 0.20, 3)),
         'inscribed_radius': str(inscribed),

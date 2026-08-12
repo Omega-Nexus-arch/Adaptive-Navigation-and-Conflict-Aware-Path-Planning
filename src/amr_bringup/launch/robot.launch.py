@@ -32,6 +32,7 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node, PushRosNamespace
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def _robot_nodes(context, *args, **kwargs):
@@ -54,12 +55,22 @@ def _robot_nodes(context, *args, **kwargs):
     xacro_file = os.path.join(description_share, 'urdf', 'amr.urdf.xacro')
     model_library = os.path.join(description_share, 'config', 'robot_models.yaml')
 
-    robot_description = Command([
-        'xacro ', xacro_file,
-        ' robot_name:=', robot_name,
-        ' robot_model:=', robot['model'],
-        ' model_config:=', model_library,
-    ])
+    # ParameterValue(..., value_type=str) is not optional here.
+    #
+    # `Command` yields a substitution whose result launch tries to interpret as
+    # YAML before handing it to the node. A URDF is XML, so that parse fails
+    # with "Unable to parse the value of parameter robot_description as yaml"
+    # and the launch aborts before a single node starts. Declaring the type
+    # tells launch to pass the text through untouched.
+    robot_description = ParameterValue(
+        Command([
+            'xacro ', xacro_file,
+            ' robot_name:=', robot_name,
+            ' robot_model:=', robot['model'],
+            ' model_config:=', model_library,
+        ]),
+        value_type=str,
+    )
 
     common = {'use_sim_time': True}
 

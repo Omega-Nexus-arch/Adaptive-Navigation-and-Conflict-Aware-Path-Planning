@@ -13,18 +13,27 @@
 # controller, its smoother and its Gazebo plugin together, because all three
 # read the same number. See docs/REFACTORING.md.
 #
-# Placeholders rewritten per robot:
-#   <robot_namespace>  robot_base_frame, odom_topic, robot_radius,
-#                      inflation_radius, max_vel_*, acc_lim_*, decel_lim_*,
-#                      robot_name, elevation_map, max_traversable_angle_degrees
+# Two different substitution mechanisms, for two different reasons:
+#
+#   `<ns>`  is replaced textually with the robot's namespace before the file is
+#           parsed. Frames MUST work this way, because their values differ per
+#           section: the global costmap is anchored to `map` while the local
+#           costmap rolls in `<ns>/odom`. A key-based rewrite cannot express
+#           that - it would set every `global_frame` in the file to the same
+#           value and silently anchor the rolling costmap to the map frame.
+#
+#   key rewrites (nav2_common RewrittenYaml) handle the values that ARE uniform
+#           wherever they appear: robot_radius, inflation_radius, max_vel_*,
+#           acc_lim_*, decel_lim_*, elevation_map, max_traversable_angle_degrees,
+#           robot_name, use_sim_time. See amr_bringup/fleet_loader.py.
 # =============================================================================
 
 bt_navigator:
   ros__parameters:
     use_sim_time: True
     global_frame: map
-    robot_base_frame: base_footprint
-    odom_topic: odom
+    robot_base_frame: <ns>/base_footprint
+    odom_topic: /<ns>/odom
     bt_loop_duration: 10
     default_server_timeout: 20
     # Distance-based replanning keeps the plan honest as peers move, without
@@ -116,8 +125,11 @@ local_costmap:
       use_sim_time: True
       update_frequency: 10.0
       publish_frequency: 5.0
-      global_frame: odom
-      robot_base_frame: base_footprint
+      # Rolling window, so it must be anchored to odom. Anchoring it to map
+      # would make the whole local costmap jump every time SLAM corrects the
+      # map->odom transform.
+      global_frame: <ns>/odom
+      robot_base_frame: <ns>/base_footprint
       rolling_window: true
       width: 8
       height: 8
@@ -169,7 +181,7 @@ global_costmap:
       update_frequency: 1.0
       publish_frequency: 1.0
       global_frame: map
-      robot_base_frame: base_footprint
+      robot_base_frame: <ns>/base_footprint
       robot_radius: 0.55
       resolution: 0.05
       track_unknown_space: true
@@ -265,9 +277,9 @@ behavior_server:
       plugin: "nav2_behaviors/DriveOnHeading"
     wait:
       plugin: "nav2_behaviors/Wait"
-    local_frame: odom
+    local_frame: <ns>/odom
     global_frame: map
-    robot_base_frame: base_footprint
+    robot_base_frame: <ns>/base_footprint
     transform_tolerance: 0.1
     simulate_ahead_time: 2.0
     max_rotational_vel: 0.9
@@ -300,7 +312,7 @@ velocity_smoother:
     min_velocity: [-0.35, 0.0, -0.9]
     max_accel: [0.35, 0.0, 0.8]
     max_decel: [-0.7, 0.0, -0.8]
-    odom_topic: "odom"
+    odom_topic: "/<ns>/odom"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
     velocity_timeout: 1.0

@@ -16,7 +16,7 @@
 # =============================================================================
 
 fleet:
-  model_library: "../../amr_description/config/robot_models.yaml"
+  model_library: "package://amr_description/config/robot_models.yaml"
   global_frame: "map"
 
   robots:
