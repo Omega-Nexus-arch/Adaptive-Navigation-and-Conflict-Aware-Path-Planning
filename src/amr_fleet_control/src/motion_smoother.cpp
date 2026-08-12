@@ -64,7 +64,7 @@ double MotionSmoother::SmoothAxis(
   //    the current velocity - may be more aggressive than speeding up, which
   //    is both physically true and the safer asymmetry.
   const bool braking =
-    (current > 1e-9 && direction < 0.0) || (current < -1e-9 && direction > 0.0);
+    (current > 1e-9 && direction < 0.0) || (current<-1e-9 && direction>0.0);
   const double magnitude_limit = braking ? decel_limit : accel_limit;
 
   // 3. Terminal-approach law. Three separate ceilings on the acceleration

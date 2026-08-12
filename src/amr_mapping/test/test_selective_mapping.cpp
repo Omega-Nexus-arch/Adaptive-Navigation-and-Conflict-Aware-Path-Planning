@@ -182,7 +182,7 @@ TEST(SelectiveMappingTest, RepeatedlyTraversedRegionsAreThrottled) {
   const SelectiveMappingStats stats = policy.Filter(source, 0.5, &filtered);
   EXPECT_GT(stats.suppression_ratio, 0.9)
     << "a saturated, unchanged, frontier-free map should be almost entirely "
-       "suppressed; got " << stats.suppression_ratio;
+    "suppressed; got " << stats.suppression_ratio;
   EXPECT_EQ(stats.policy_state, "throttled");
 }
 
@@ -247,7 +247,7 @@ TEST(SelectiveMappingTest, ASignificantChangeBypassesThrottling) {
   const SelectiveMappingStats stats = policy.Filter(source, 0.6, &filtered);
   EXPECT_EQ(filtered[index], kOccupied)
     << "a new obstacle must reach the merged map immediately, however well "
-       "travelled the aisle";
+    "travelled the aisle";
   EXPECT_GT(stats.cells_written, 0u);
 }
 

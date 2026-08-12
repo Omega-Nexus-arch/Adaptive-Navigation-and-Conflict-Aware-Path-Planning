@@ -297,7 +297,7 @@ TEST(ImuValidatorTest, ImplausibleAngularVelocityIsFlagged) {
   EXPECT_EQ(result.status, ValidationStatus::kDegraded);
   EXPECT_TRUE(result.ShouldForward())
     << "dropping IMU data mid-manoeuvre would destabilise the localisation "
-       "that has to recover from the fault";
+    "that has to recover from the fault";
   EXPECT_NEAR(validator.PeakAngularVelocity(), 40.0, 1e-9);
 }
 

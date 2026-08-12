@@ -1,0 +1,18 @@
+digraph G {
+"amr1/odom" -> "amr1/base_footprint"[label=" Broadcaster: default_authority\nAverage rate: 50.199\nBuffer length: 5.02\nMost recent transform: 14.272\nOldest transform: 9.252\n"];
+"amr1/map" -> "amr1/odom"[label=" Broadcaster: default_authority\nAverage rate: 14.905\nBuffer length: 5.032\nMost recent transform: 14.448\nOldest transform: 9.416\n"];
+"amr1/base_footprint" -> "amr1/base_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"amr1/base_link" -> "amr1/camera_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"amr1/camera_link" -> "amr1/camera_optical_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"amr1/base_link" -> "amr1/cargo_deck"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"amr1/base_link" -> "amr1/front_caster_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"amr1/base_link" -> "amr1/imu_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"amr1/base_link" -> "amr1/lidar_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"amr1/base_link" -> "amr1/rear_caster_link"[label=" Broadcaster: default_authority\nAverage rate: 10000.0\nBuffer length: 0.0\nMost recent transform: 0.0\nOldest transform: 0.0\n"];
+"amr1/base_link" -> "amr1/left_wheel_link"[label=" Broadcaster: default_authority\nAverage rate: 30.279\nBuffer length: 5.02\nMost recent transform: 14.272\nOldest transform: 9.252\n"];
+"amr1/base_link" -> "amr1/right_wheel_link"[label=" Broadcaster: default_authority\nAverage rate: 30.279\nBuffer length: 5.02\nMost recent transform: 14.272\nOldest transform: 9.252\n"];
+edge [style=invis];
+ subgraph cluster_legend { style=bold; color=black; label ="view_frames Result";
+"Recorded at time: 1786522097.6952538"[ shape=plaintext ] ;
+}->"amr1/map";
+}

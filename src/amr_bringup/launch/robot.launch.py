@@ -1,24 +1,19 @@
 # Copyright 2026 RSE Candidate
 # Licensed under the Apache License, Version 2.0.
-"""Everything belonging to ONE robot, in that robot's namespace.
+"""Everything belonging to one robot, in that robot's namespace.
 
-This is the unit the fleet launch file repeats. It knows nothing about how
-many robots exist, which is what lets `fleet.launch.py` scale from two to ten
-by iterating a roster.
+The startup order here is intentional and is part of the system's correctness:
 
-Composed of four sub-launches so each concern can be run, disabled or replaced
-independently:
+1. ``fleet_control.launch.py`` (when run standalone) publishes the shared
+   ``map`` frame and the map -> <robot>/map anchors.
+2. robot_state_publisher publishes the static body TF and Gazebo spawns the
+   entity.
+3. After ``startup_delay`` seconds, Gazebo's diff-drive plugin has published
+   <robot>/odom -> <robot>/base_footprint, so SLAM and nav2 can activate
+   without racing a TF frame that does not exist yet.
 
-    robot.launch.py
-      +-- (description + spawn)      URDF, robot_state_publisher, Gazebo spawn
-      +-- (sensor validation)        amr_sensor_bsp
-      +-- (fleet control)            smoother, safety override, trajectory
-      +-- slam.launch.py             slam_toolbox + selective mapping
-      +-- navigation.launch.py       nav2
-
-Run one robot on its own for debugging:
-
-    ros2 launch amr_bringup robot.launch.py robot_name:=amr1
+``fleet.launch.py`` starts fleet-level services once before repeating this file
+and passes ``fleet_services:=false`` to each instance.
 """
 
 import os
@@ -27,27 +22,35 @@ from ament_index_python.packages import get_package_share_directory
 from amr_bringup.fleet_loader import load_fleet
 from launch import LaunchDescription
 from launch.actions import (
-    DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, OpaqueFunction)
-from launch.conditions import IfCondition
+    DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, LogInfo,
+    OpaqueFunction, TimerAction)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node, PushRosNamespace
 from launch_ros.parameter_descriptions import ParameterValue
 
 
+def _enabled(value):
+    """Interpret a ROS launch boolean consistently."""
+    return value.strip().lower() in ('true', '1', 'yes')
+
+
 def _robot_nodes(context, *args, **kwargs):
-    """Build the node set once the launch arguments have concrete values."""
+    """Build the robot action group once launch arguments are concrete."""
     robot_name = LaunchConfiguration('robot_name').perform(context)
     fleet_config = LaunchConfiguration('fleet_config').perform(context)
-    use_slam = LaunchConfiguration('slam').perform(context)
-    use_navigation = LaunchConfiguration('navigation').perform(context)
+    use_slam = _enabled(LaunchConfiguration('slam').perform(context))
+    use_navigation = _enabled(LaunchConfiguration('navigation').perform(context))
+    launch_fleet_services = _enabled(
+        LaunchConfiguration('fleet_services').perform(context))
+    startup_delay = float(LaunchConfiguration('startup_delay').perform(context))
 
     fleet = load_fleet(fleet_config)
-    matches = [r for r in fleet['robots'] if r['name'] == robot_name]
+    matches = [robot for robot in fleet['robots'] if robot['name'] == robot_name]
     if not matches:
         raise RuntimeError(
             f"robot '{robot_name}' is not in {fleet_config}. "
-            f"Roster: {', '.join(r['name'] for r in fleet['robots'])}")
+            f"Roster: {', '.join(robot['name'] for robot in fleet['robots'])}")
     robot = matches[0]
 
     description_share = get_package_share_directory('amr_description')
@@ -55,13 +58,8 @@ def _robot_nodes(context, *args, **kwargs):
     xacro_file = os.path.join(description_share, 'urdf', 'amr.urdf.xacro')
     model_library = os.path.join(description_share, 'config', 'robot_models.yaml')
 
-    # ParameterValue(..., value_type=str) is not optional here.
-    #
-    # `Command` yields a substitution whose result launch tries to interpret as
-    # YAML before handing it to the node. A URDF is XML, so that parse fails
-    # with "Unable to parse the value of parameter robot_description as yaml"
-    # and the launch aborts before a single node starts. Declaring the type
-    # tells launch to pass the text through untouched.
+    # Command() output is XML, not YAML. ParameterValue prevents launch from
+    # attempting to YAML-parse the URDF before robot_state_publisher sees it.
     robot_description = ParameterValue(
         Command([
             'xacro ', xacro_file,
@@ -71,11 +69,26 @@ def _robot_nodes(context, *args, **kwargs):
         ]),
         value_type=str,
     )
-
     common = {'use_sim_time': True}
 
-    nodes = [
-        # --- Description ------------------------------------------------------
+    # The arguments are absolute where they need to be, but this node itself
+    # stays in the robot group so a fleet gets /amr1/spawn_entity and
+    # /amr2/spawn_entity rather than two nodes fighting for /spawn_entity.
+    spawn_entity = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        name='spawn_entity',
+        output='screen',
+        arguments=[
+            '-topic', f'/{robot_name}/robot_description',
+            '-entity', robot_name,
+            '-robot_namespace', f'/{robot_name}',
+            '-x', str(robot['x']), '-y', str(robot['y']),
+            '-Y', str(robot['yaw']), '-z', '0.05',
+        ],
+    )
+
+    namespaced_nodes = [
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
@@ -83,130 +96,98 @@ def _robot_nodes(context, *args, **kwargs):
             output='screen',
             parameters=[{
                 'robot_description': robot_description,
-                # Links are prefixed inside the URDF itself, so frame_prefix
-                # must stay empty or every frame would be doubly prefixed.
+                # URDF links are already named amrN/<link>.
                 'frame_prefix': '',
                 **common,
             }],
         ),
-
-        # --- Spawn into Gazebo at its roster pose ------------------------------
         Node(
-            package='gazebo_ros',
-            executable='spawn_entity.py',
-            name='spawn_entity',
-            output='screen',
-            arguments=[
-                '-topic', f'/{robot_name}/robot_description',
-                '-entity', robot_name,
-                '-robot_namespace', f'/{robot_name}',
-                '-x', str(robot['x']),
-                '-y', str(robot['y']),
-                '-Y', str(robot['yaw']),
-                '-z', '0.05',
-            ],
-        ),
-
-        # --- BSP sensor validation --------------------------------------------
-        # Placed before everything that consumes sensor data. Nothing
-        # downstream subscribes to a *_raw topic.
-        Node(
-            package='amr_sensor_bsp',
-            executable='bsp_validation_node',
-            name='bsp_validation',
-            output='screen',
+            package='amr_sensor_bsp', executable='bsp_validation_node',
+            name='bsp_validation', output='screen',
             parameters=[{
-                'robot_name': robot_name,
-                'fleet_config': fleet_config,
-                'ground_rejection_enabled': True,
-                'check_image_intensity': True,
+                'robot_name': robot_name, 'fleet_config': fleet_config,
+                'ground_rejection_enabled': True, 'check_image_intensity': True,
                 **common,
             }],
         ),
-
-        # --- Velocity smoothing (traffic scaling + accel/jerk limits) ---------
         Node(
-            package='amr_fleet_control',
-            executable='velocity_smoother_node',
-            name='velocity_smoother',
-            output='screen',
+            package='amr_fleet_control', executable='velocity_smoother_node',
+            name='velocity_smoother', output='screen',
             parameters=[{
-                'robot_name': robot_name,
-                'fleet_config': fleet_config,
-                'control_rate': 50.0,
-                **common,
+                'robot_name': robot_name, 'fleet_config': fleet_config,
+                'control_rate': 50.0, **common,
             }],
         ),
-
-        # --- Safety override: sole publisher of cmd_vel -----------------------
         Node(
-            package='amr_fleet_control',
-            executable='safety_override_node',
-            name='safety_override',
-            output='screen',
+            package='amr_fleet_control', executable='safety_override_node',
+            name='safety_override', output='screen',
             parameters=[{
-                'robot_name': robot_name,
-                'fleet_config': fleet_config,
-                'control_rate': 50.0,
-                **common,
+                'robot_name': robot_name, 'fleet_config': fleet_config,
+                'control_rate': 50.0, **common,
             }],
         ),
-
-        # --- Trajectory broadcast for conflict-aware planning -----------------
         Node(
-            package='amr_fleet_control',
-            executable='trajectory_broadcaster_node',
-            name='trajectory_broadcaster',
-            output='screen',
-            parameters=[{
-                'robot_name': robot_name,
-                'fleet_config': fleet_config,
-                **common,
-            }],
+            package='amr_fleet_control', executable='trajectory_broadcaster_node',
+            name='trajectory_broadcaster', output='screen',
+            parameters=[{'robot_name': robot_name, 'fleet_config': fleet_config, **common}],
         ),
     ]
 
-    includes = []
-    if use_slam.lower() in ('true', '1', 'yes'):
-        includes.append(
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    os.path.join(bringup_share, 'launch', 'slam.launch.py')),
-                launch_arguments={
-                    'robot_name': robot_name,
-                    'fleet_config': fleet_config,
-                }.items(),
-            ))
-    if use_navigation.lower() in ('true', '1', 'yes'):
-        includes.append(
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    os.path.join(bringup_share, 'launch', 'navigation.launch.py')),
-                launch_arguments={
-                    'robot_name': robot_name,
-                    'fleet_config': fleet_config,
-                }.items(),
-            ))
+    delayed_stack = []
+    if use_slam:
+        delayed_stack.append(IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(os.path.join(bringup_share, 'launch', 'slam.launch.py')),
+            launch_arguments={'robot_name': robot_name, 'fleet_config': fleet_config}.items()))
+    if use_navigation:
+        delayed_stack.append(IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(bringup_share, 'launch', 'navigation.launch.py')),
+            launch_arguments={'robot_name': robot_name, 'fleet_config': fleet_config}.items()))
 
-    # PushRosNamespace is what makes every robot's graph identical apart from
-    # its prefix, so no node has to know its own name to find its topics.
-    return [GroupAction([PushRosNamespace(robot_name)] + nodes + includes)]
+    # Nav2 requires both dynamic TF links. Starting it as a sibling of Gazebo
+    # spawn races the diff-drive plugin and is the source of "frame does not
+    # exist" lifecycle failures. A short deterministic delay is more reliable
+    # than letting lifecycle retries decide when the base is ready.
+    if delayed_stack:
+        namespaced_nodes.append(TimerAction(
+            period=startup_delay,
+            actions=[
+                LogInfo(msg=[
+                    f'[{robot_name}] Gazebo/TF settle delay complete; starting ',
+                    'SLAM and navigation.']),
+                *delayed_stack,
+            ],
+        ))
+
+    actions = []
+    if launch_fleet_services:
+        # Standalone robot debugging still needs the shared map frame. The
+        # fleet launch starts this singleton separately and disables it here.
+        actions.append(IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(bringup_share, 'launch', 'fleet_control.launch.py')),
+            launch_arguments={'fleet_config': fleet_config}.items()))
+
+    actions.append(
+        GroupAction([PushRosNamespace(robot_name), spawn_entity] + namespaced_nodes))
+    return actions
 
 
 def generate_launch_description():
     bringup_share = get_package_share_directory('amr_bringup')
-
     return LaunchDescription([
         DeclareLaunchArgument('robot_name', description='Roster name, e.g. amr1.'),
         DeclareLaunchArgument(
             'fleet_config',
             default_value=os.path.join(bringup_share, 'config', 'fleet.yaml'),
             description='Fleet roster. Swap for fleet_ten_robots.yaml to scale up.'),
+        DeclareLaunchArgument('slam', default_value='true'),
+        DeclareLaunchArgument('navigation', default_value='true'),
         DeclareLaunchArgument(
-            'slam', default_value='true',
-            description='Run slam_toolbox and the selective mapping filter.'),
+            'fleet_services', default_value='true',
+            description='Start global map fusion/traffic services. fleet.launch.py sets false.'),
         DeclareLaunchArgument(
-            'navigation', default_value='true',
-            description='Run nav2 for this robot.'),
+            'startup_delay', default_value='3.0',
+            description='Seconds for Gazebo spawn and odometry TF before SLAM/nav2 start.'),
         OpaqueFunction(function=_robot_nodes),
     ])
