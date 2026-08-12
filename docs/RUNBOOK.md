@@ -52,7 +52,7 @@ colcon test --event-handlers console_direct+
 colcon test-result --verbose
 ```
 
-**Check:** 217 tests, 0 failures. This alone validates the motion smoother, the
+**Check:** 223 tests, 0 failures. This alone validates the motion smoother, the
 safety envelope, conflict detection, the yielding protocol, the sensor
 validators, selective mapping, map fusion, the slope cost model, the world
 geometry and every config loader.
@@ -158,6 +158,19 @@ ros2 topic hz /amr1/scan          # validated LiDAR flowing
 ros2 topic echo /amr1/sensor_health --once
 ros2 topic echo /amr1/safety_status --once
 ```
+
+**Check the TF tree is whole** -- this is the single most useful check at this
+step, because a split tree makes everything downstream fail confusingly:
+
+```bash
+ros2 run tf2_ros tf2_echo map amr1/base_footprint   # must resolve, not time out
+ros2 node list | grep amr1                          # every node must be /amr1/...
+```
+
+If `ros2 node list` shows a bare `/slam_toolbox` or `/controller_server` rather
+than `/amr1/...`, the node is outside its namespace, its parameters have not
+applied, and it is running on defaults. That is what
+`test_launch_namespacing.py` exists to prevent.
 
 `safety_status.halt_active` should be `false` once scans arrive. Before the
 first scan it is `true` with `reason: 3` (SENSOR_TIMEOUT) — that is the
@@ -335,6 +348,8 @@ milliseconds.
 | No plans | `ros2 lifecycle get /amr1/planner_server` | nav2 not activated; raise `spawn_delay` |
 | Phantom wall on a ramp | `ros2 topic echo /amr1/sensor_health` | IMU rejected, so ground-rejection is off |
 | `Test::Run() is private` when building tests | — | A test helper collides with a `testing::Test` member (`Run`, `SetUp`, `HasFailure`…). Rename the helper. |
+| `Tf has two or more unconnected trees` | `ros2 node list \| grep amr1` | A node launched outside its namespace, so `root_key` params did not apply and SLAM published `map -> odom` instead of `amr1/map -> amr1/odom`. |
+| `No critics defined for FollowPath` | `ros2 node list \| grep controller_server` | Same cause: `/controller_server` instead of `/amr1/controller_server` means nav2 ran on defaults. |
 | `Unable to parse the value of parameter robot_description as yaml` | — | A `Command()` substitution needs `ParameterValue(..., value_type=str)`. Fixed; rebuild `amr_bringup`. |
 | Local costmap jumps / drifts as the map updates | `ros2 param get /amr1/local_costmap/local_costmap global_frame` | Must be `amr1/odom`, not `map`. |
 | `model library not found: .../install/amr_bringup/share/amr_description/...` | — | Stale `fleet.yaml` using a relative path. Fixed: it is now a `package://` URI. Rebuild `amr_bringup`. |

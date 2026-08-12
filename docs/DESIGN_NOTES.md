@@ -382,6 +382,59 @@ parameters that assumption is false, and it fails quietly.
 
 ---
 
+## 7e. One scoping mistake, three unrelated-looking failures
+
+The most instructive bug in the project, because the symptoms were nowhere near
+the cause.
+
+SLAM and nav2 are started a few seconds after the rest of the robot, so the
+Gazebo diff-drive plugin has time to begin publishing `odom -> base_footprint`.
+That delay was implemented by putting a `TimerAction` inside the robot's
+namespaced group:
+
+```python
+namespaced_nodes.append(TimerAction(period=delay, actions=[slam, navigation]))
+...
+GroupAction([PushRosNamespace(robot_name)] + namespaced_nodes)   # the bug
+```
+
+`PushRosNamespace` is **scoped**. `GroupAction` applies it while visiting its
+children and pops it as soon as that visit finishes. `TimerAction` does not run
+its children during the visit -- it defers them -- so by the time they start,
+the namespace is gone. Everything in the timer launched into the **root**
+namespace, silently.
+
+Three failures followed, none of which points at namespacing:
+
+| Symptom | Actual cause |
+|---|---|
+| `Could not find a connection between 'map' and 'amr1/base_footprint'. Tf has two or more unconnected trees.` | `slam_toolbox` started as `/slam_toolbox`, so its `root_key: amr1` parameters never matched. On defaults it published `map -> odom` while the robot's frames were `amr1/odom` and `amr1/base_footprint`. |
+| `No critics defined for FollowPath`, lifecycle bringup aborts | nav2's servers started unnamespaced, so their parameters did not match either. `controller_server` came up with an empty critics list. |
+| Local costmap silently loads `static/obstacle/inflation` | Same cause. The configured `obstacle/fleet/inflation` never applied, so the conflict-aware fleet layer was simply absent -- and nothing said so. |
+
+The fix is that every deferred block carries its own push, with the timer on the
+outside:
+
+```python
+TimerAction(period=delay, actions=[namespaced(robot_name, [slam, navigation])])
+```
+
+Wrapping now happens in exactly one helper, `namespaced()`, and
+`test_launch_namespacing.py` walks the launch description that
+`robot.launch.py` actually produces -- modelling the timer's cleared scope --
+asserting no per-robot node is reachable without a push, for one robot and for
+all ten. Two of its checks are pure source-shape assertions that run without ROS
+installed, so the guarantee holds even in a bare checkout.
+
+**The transferable lesson:** when a parameter file is keyed by node name, a node
+in the wrong namespace does not fail -- it quietly runs on defaults. That makes
+namespacing a *correctness* property worth asserting structurally, not a
+cosmetic one. The generic version: any mechanism that silently substitutes a
+default when a lookup misses will convert a wiring error into a behavioural one,
+and behavioural errors are debugged far from where they were introduced.
+
+---
+
 ## 8. Log-odds map fusion, not maximum occupancy
 
 The simple fusion is to take the maximum occupancy across robots. In this
@@ -412,7 +465,7 @@ accumulator exists to avoid.
 
 Honest gaps, roughly in the order I would close them.
 
-1. **Integration tests under `launch_testing`.** The 217 automated tests cover the
+1. **Integration tests under `launch_testing`.** The 223 automated tests cover the
    algorithms thoroughly and the node wiring not at all. A `launch_testing`
    suite that brings up two robots headless and asserts on `/cmd_vel` and
    `/fleet/traffic_directives` would cover the seam between them.

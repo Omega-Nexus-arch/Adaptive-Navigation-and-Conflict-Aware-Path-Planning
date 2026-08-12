@@ -176,10 +176,17 @@
         <plugin name="${robot_name}_camera_plugin" filename="libgazebo_ros_camera.so">
           <ros>
             <namespace>/${robot_name}</namespace>
-            <remapping>~/image_raw:=camera/image_unvalidated</remapping>
-            <remapping>~/camera_info:=camera/camera_info</remapping>
           </ros>
-          <camera_name>camera</camera_name>
+          <!-- Named `camera_raw`, so the plugin publishes
+               /<robot>/camera_raw/image_raw of its own accord and the BSP layer
+               republishes the validated copy as /<robot>/camera/image_raw.
+
+               The earlier version kept the name `camera` and remapped
+               `~/image_raw`. gazebo_ros_camera resolves `~` against its own
+               internal node, not against the sensor, so the remap silently
+               matched nothing and no image was ever published. Choosing the
+               name is deterministic; remapping `~` is not. -->
+          <camera_name>camera_raw</camera_name>
           <frame_name>${prefix}camera_optical_link</frame_name>
         </plugin>
       </sensor>

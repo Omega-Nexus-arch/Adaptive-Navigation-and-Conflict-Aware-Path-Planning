@@ -35,6 +35,37 @@ def _enabled(value):
     return value.strip().lower() in ('true', '1', 'yes')
 
 
+def namespaced(robot_name, actions):
+    """Wrap ``actions`` so every node inside lands under ``/<robot_name>``.
+
+    Use this for EVERY block of per-robot actions, including deferred ones.
+
+    ``PushRosNamespace`` is *scoped*: a ``GroupAction`` applies it while
+    visiting its children and pops it immediately afterwards. ``TimerAction``
+    does not run its children during that visit -- it defers them to a later
+    tick, by which point the namespace has already been popped. Nesting a timer
+    inside a namespaced group therefore launches the timed nodes in the **root**
+    namespace, silently.
+
+    That single mistake produced three unrelated-looking failures:
+
+    * ``slam_toolbox`` started as ``/slam_toolbox`` instead of
+      ``/<robot>/slam_toolbox``, so its ``root_key: <robot>`` parameters never
+      matched. It fell back to defaults and published ``map -> odom`` while the
+      robot's own frames were ``<robot>/odom`` and ``<robot>/base_footprint``,
+      leaving two unconnected TF trees.
+    * nav2's servers started unnamespaced for the same reason, so
+      ``No critics defined for FollowPath`` aborted the lifecycle bringup.
+    * the local costmap silently loaded nav2's default plugin list instead of
+      the configured one, so the conflict-aware fleet layer was absent.
+
+    Every deferred block must therefore carry its own push. This helper is the
+    only place that wrapping happens, and ``test_launch_namespacing.py`` walks
+    the generated launch description to prove nothing escapes it.
+    """
+    return GroupAction([PushRosNamespace(robot_name)] + list(actions))
+
+
 def _robot_nodes(context, *args, **kwargs):
     """Build the robot action group once launch arguments are concrete."""
     robot_name = LaunchConfiguration('robot_name').perform(context)
@@ -144,32 +175,41 @@ def _robot_nodes(context, *args, **kwargs):
                 os.path.join(bringup_share, 'launch', 'navigation.launch.py')),
             launch_arguments={'robot_name': robot_name, 'fleet_config': fleet_config}.items()))
 
-    # Nav2 requires both dynamic TF links. Starting it as a sibling of Gazebo
-    # spawn races the diff-drive plugin and is the source of "frame does not
-    # exist" lifecycle failures. A short deterministic delay is more reliable
-    # than letting lifecycle retries decide when the base is ready.
-    if delayed_stack:
-        namespaced_nodes.append(TimerAction(
-            period=startup_delay,
-            actions=[
-                LogInfo(msg=[
-                    f'[{robot_name}] Gazebo/TF settle delay complete; starting ',
-                    'SLAM and navigation.']),
-                *delayed_stack,
-            ],
-        ))
-
     actions = []
     if launch_fleet_services:
-        # Standalone robot debugging still needs the shared map frame. The
-        # fleet launch starts this singleton separately and disables it here.
+        # Deliberately NOT namespaced: map fusion and traffic control are fleet
+        # singletons living in the root namespace. Standalone robot debugging
+        # still needs the shared map frame; fleet.launch.py sets this false and
+        # starts them once for the whole fleet.
         actions.append(IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(bringup_share, 'launch', 'fleet_control.launch.py')),
             launch_arguments={'fleet_config': fleet_config}.items()))
 
-    actions.append(
-        GroupAction([PushRosNamespace(robot_name), spawn_entity] + namespaced_nodes))
+    # Block 1: everything that can start immediately.
+    actions.append(namespaced(robot_name, [spawn_entity] + namespaced_nodes))
+
+    # Block 2: SLAM and nav2, deferred until Gazebo has spawned the robot and
+    # the diff-drive plugin is publishing odom -> base_footprint. Starting them
+    # as siblings of the spawn races that plugin and produces "frame does not
+    # exist" lifecycle failures.
+    #
+    # The TimerAction sits OUTSIDE block 1 and its children get their own
+    # namespace push. Nesting the timer inside block 1's group would leave these
+    # nodes in the root namespace -- see namespaced() for what that breaks.
+    if delayed_stack:
+        actions.append(TimerAction(
+            period=startup_delay,
+            actions=[
+                namespaced(robot_name, [
+                    LogInfo(msg=[
+                        f'[{robot_name}] Gazebo/TF settle delay complete; starting ',
+                        'SLAM and navigation.']),
+                    *delayed_stack,
+                ]),
+            ],
+        ))
+
     return actions
 
 

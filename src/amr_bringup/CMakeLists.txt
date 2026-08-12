@@ -32,6 +32,8 @@ if(BUILD_TESTING)
   set(ament_cmake_copyright_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
   ament_add_pytest_test(fleet_config_test test/test_fleet_loader.py)
+  # Structural guard: no per-robot node may escape its namespace.
+  ament_add_pytest_test(launch_namespacing_test test/test_launch_namespacing.py)
 endif()
 
 ament_package()
