@@ -1,0 +1,306 @@
+# =============================================================================
+# NAV2 PARAMETERS - one template for every robot in the fleet
+# =============================================================================
+# There is deliberately no nav2_amr1.yaml and nav2_amr2.yaml. Every value that
+# differs between robots is rewritten at launch time by
+# amr_bringup/fleet_loader.py:nav2_substitutions(), which derives it from
+# amr_description/config/robot_models.yaml.
+#
+# That matters more than it looks. The obvious alternative - one nav2 file per
+# robot - duplicates footprint radius, velocity limits and acceleration limits
+# into a second place, and the copies drift the first time anyone tunes a
+# robot. Here, changing `max_accel_x` for the heavy mapper retunes its
+# controller, its smoother and its Gazebo plugin together, because all three
+# read the same number. See docs/REFACTORING.md.
+#
+# Placeholders rewritten per robot:
+#   <robot_namespace>  robot_base_frame, odom_topic, robot_radius,
+#                      inflation_radius, max_vel_*, acc_lim_*, decel_lim_*,
+#                      robot_name, elevation_map, max_traversable_angle_degrees
+# =============================================================================
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: True
+    global_frame: map
+    robot_base_frame: base_footprint
+    odom_topic: odom
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    # Distance-based replanning keeps the plan honest as peers move, without
+    # replanning every tick in a warehouse full of moving obstacles.
+    navigators: ["navigate_to_pose", "navigate_through_poses"]
+    navigate_to_pose:
+      plugin: "nav2_bt_navigator/NavigateToPoseNavigator"
+    navigate_through_poses:
+      plugin: "nav2_bt_navigator/NavigateThroughPosesNavigator"
+
+controller_server:
+  ros__parameters:
+    use_sim_time: True
+    controller_frequency: 20.0
+    # Deliberately loose: the robot is *supposed* to stop for a yield or a
+    # safety halt. A tight stuck-detection threshold would fire a recovery
+    # behaviour every time the traffic controller did its job.
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 1.0
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5
+      # Generous: a robot held at a doorway by the yielding protocol has not
+      # failed, it is waiting its turn.
+      movement_time_allowance: 30.0
+
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25
+      yaw_goal_tolerance: 0.25
+
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: True
+      min_vel_x: 0.0
+      min_vel_y: 0.0
+      max_vel_x: 0.75
+      max_vel_y: 0.0
+      max_vel_theta: 0.9
+      min_speed_xy: 0.0
+      max_speed_xy: 0.75
+      min_speed_theta: 0.0
+      acc_lim_x: 0.35
+      acc_lim_y: 0.0
+      acc_lim_theta: 0.8
+      decel_lim_x: -0.7
+      decel_lim_y: 0.0
+      decel_lim_theta: -0.8
+      vx_samples: 20
+      vy_samples: 1
+      vtheta_samples: 20
+      sim_time: 1.7
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 0.2
+      xy_goal_tolerance: 0.25
+      trans_stopped_velocity: 0.25
+      short_circuit_trajectory_evaluation: True
+      stateful: True
+      critics:
+        - "RotateToGoal"
+        - "Oscillation"
+        - "BaseObstacle"
+        - "GoalAlign"
+        - "PathAlign"
+        - "PathDist"
+        - "GoalDist"
+      BaseObstacle.scale: 0.02
+      PathAlign.scale: 32.0
+      PathAlign.forward_point_distance: 0.1
+      GoalAlign.scale: 24.0
+      GoalAlign.forward_point_distance: 0.1
+      PathDist.scale: 32.0
+      GoalDist.scale: 24.0
+      RotateToGoal.scale: 32.0
+      RotateToGoal.slowing_factor: 5.0
+      RotateToGoal.lookahead_time: -1.0
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: True
+      update_frequency: 10.0
+      publish_frequency: 5.0
+      global_frame: odom
+      robot_base_frame: base_footprint
+      rolling_window: true
+      width: 8
+      height: 8
+      resolution: 0.05
+      robot_radius: 0.55
+      # `fleet` runs before `inflation` so peer predictions get inflated too.
+      plugins: ["obstacle_layer", "fleet_layer", "inflation_layer"]
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          # The BSP-validated topic. `scan_raw` is never subscribed to by any
+          # part of the navigation stack.
+          topic: scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 8.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 6.0
+          obstacle_min_range: 0.0
+
+      # Conflict-aware local planning: peers' predicted positions become cost.
+      fleet_layer:
+        plugin: "amr_navigation/FleetTrajectoryLayer"
+        enabled: True
+        robot_name: amr1
+        topic: /fleet/trajectories
+        horizon_seconds: 3.0
+        trajectory_timeout: 1.0
+        inflation_margin: 0.15
+        present_cost: 200
+        horizon_cost: 30
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.75
+
+      always_send_full_costmap: True
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      use_sim_time: True
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_footprint
+      robot_radius: 0.55
+      resolution: 0.05
+      track_unknown_space: true
+      # `slope` sits between the map and the inflation, so terrain cost is
+      # inflated like any other cost and the planner keeps clear of ramp edges.
+      plugins: ["static_layer", "slope_layer", "obstacle_layer", "inflation_layer"]
+
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        # The fused fleet map, not a per-robot one.
+        map_subscribe_transient_local: True
+        map_topic: /map
+
+      # Ramp/slope traversability cost.
+      slope_layer:
+        plugin: "amr_navigation/SlopeLayer"
+        enabled: True
+        elevation_map: ""
+        free_angle_degrees: 2.0
+        max_traversable_angle_degrees: 16.0
+        base_cost: 40
+        max_cost: 253
+        # > 1 keeps a gentle service ramp cheap while making a steep
+        # maintenance ramp a genuine last resort.
+        curve_exponent: 2.0
+        unknown_is_free: True
+        publish_debug_grid: True
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: scan
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 12.0
+          obstacle_max_range: 10.0
+
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.75
+
+      always_send_full_costmap: True
+
+planner_server:
+  ros__parameters:
+    use_sim_time: True
+    expected_planner_frequency: 1.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      # Smac 2D honours intermediate costmap values, which is what makes the
+      # slope layer's graded cost actually change the route. NavFn's default
+      # behaviour treats anything below lethal much more coarsely, and the
+      # ramp-avoidance experiment would be far less crisp.
+      plugin: "nav2_smac_planner/SmacPlanner2D"
+      tolerance: 0.25
+      downsample_costmap: false
+      allow_unknown: true
+      max_iterations: 1000000
+      max_planning_time: 3.0
+      # High enough that a graded slope cost meaningfully bends the path.
+      cost_travel_multiplier: 3.0
+      use_final_approach_orientation: true
+
+smoother_server:
+  ros__parameters:
+    use_sim_time: True
+    smoother_plugins: ["simple_smoother"]
+    simple_smoother:
+      plugin: "nav2_smoother::SimpleSmoother"
+      tolerance: 1.0e-10
+      max_its: 1000
+      do_refinement: True
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: True
+    local_costmap_topic: local_costmap/costmap_raw
+    global_costmap_topic: global_costmap/costmap_raw
+    local_footprint_topic: local_costmap/published_footprint
+    global_footprint_topic: global_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+    local_frame: odom
+    global_frame: map
+    robot_base_frame: base_footprint
+    transform_tolerance: 0.1
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 0.9
+    min_rotational_vel: 0.2
+    rotational_acc_lim: 0.8
+
+waypoint_follower:
+  ros__parameters:
+    use_sim_time: True
+    loop_rate: 20
+    stop_on_failure: false
+    waypoint_task_executor_plugin: "wait_at_waypoint"
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: True
+      waypoint_pause_duration: 200
+
+velocity_smoother:
+  ros__parameters:
+    # nav2's own smoother is DISABLED. Velocity shaping is done by
+    # amr_fleet_control's motion smoother, which nav2's cannot replace: it has
+    # no jerk limit, no payload dependence, and no notion of a traffic
+    # directive. Leaving both in the chain would double-filter the command and
+    # make the measured acceleration profile impossible to attribute.
+    use_sim_time: True
+    smoothing_frequency: 20.0
+    scale_velocities: False
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.75, 0.0, 0.9]
+    min_velocity: [-0.35, 0.0, -0.9]
+    max_accel: [0.35, 0.0, 0.8]
+    max_decel: [-0.7, 0.0, -0.8]
+    odom_topic: "odom"
+    odom_duration: 0.1
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0

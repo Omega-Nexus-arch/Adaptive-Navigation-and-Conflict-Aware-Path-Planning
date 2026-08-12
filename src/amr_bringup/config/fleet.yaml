@@ -1,0 +1,107 @@
+# =============================================================================
+# FLEET ROSTER
+# =============================================================================
+# The single file that defines *which robots exist*. Physical properties live
+# in amr_description/config/robot_models.yaml; this file only says which model
+# each robot instance uses, where it starts, and how the fleet behaves as a
+# whole.
+#
+# ---------------------------------------------------------------------------
+# SCALING THE FLEET
+# ---------------------------------------------------------------------------
+# To run ten robots instead of two, append eight entries to `robots:` below.
+# Nothing else changes:
+#
+#   * amr_bringup/launch/fleet.launch.py iterates this list, so it spawns and
+#     configures however many it finds;
+#   * amr_core::FleetConfig hands every node a resolved profile, so no node
+#     names a robot;
+#   * the traffic controller's conflict detector and yielding protocol are
+#     written over the roster, not over a pair;
+#   * map_fusion creates one subscription per entry and anchors each robot's
+#     SLAM frame from its start pose.
+#
+# Two rules the loader enforces at startup, so a bad roster fails immediately
+# rather than misbehaving later:
+#
+#   1. `name` must be unique - it is used verbatim as a ROS namespace.
+#   2. `yield_priority` must be unique - equal priorities would make the
+#      yielding protocol depend on message arrival order, which is how an
+#      intermittent deadlock gets shipped.
+#
+# See amr_bringup/config/fleet_ten_robots.yaml for a worked ten-robot roster.
+# =============================================================================
+
+fleet:
+  # Resolved relative to this file.
+  model_library: "../../amr_description/config/robot_models.yaml"
+
+  # The frame all plans, trajectories and the merged map share.
+  global_frame: "map"
+
+  robots:
+    # -- AMR-1: heavy mapper / lead ------------------------------------------
+    # Higher priority: mission-critical, and the expensive one to stop and
+    # restart. The scout gives way to it.
+    - name: "amr1"
+      model: "heavy_mapper"
+      x: -18.5
+      y: 2.2
+      yaw: 0.0
+      yield_priority: 100
+
+    # -- AMR-2: light scout / follower ---------------------------------------
+    - name: "amr2"
+      model: "light_scout"
+      x: -18.5
+      y: 0.0
+      yaw: 0.0
+      yield_priority: 50
+
+  # ---------------------------------------------------------------------------
+  # Fleet-wide traffic policy
+  # ---------------------------------------------------------------------------
+  policy:
+    # --- Conflict detection ---------------------------------------------------
+    # How far ahead each robot projects its motion [s]. Long enough to see a
+    # doorway conflict coming, short enough that the prediction is still worth
+    # believing.
+    horizon_seconds: 4.0
+
+    # Spacing of the space-time samples compared by the conflict detector [s].
+    sample_period: 0.2
+
+    # Clearance added to the sum of two footprint radii before an overlap
+    # counts as a conflict [m]. Covers localisation error and the fact that a
+    # circumscribed radius overstates a rectangular robot in some headings.
+    conflict_margin: 0.35
+
+    # Conflicts further out than this are ignored: at four seconds a
+    # prediction is a guess, and acting on guesses costs throughput.
+    conflict_react_seconds: 3.0
+
+    # Below this time-to-conflict a yield becomes a controlled stop rather
+    # than a slow-down [s].
+    hard_yield_seconds: 1.5
+
+    # Speed multiplier for a soft (SLOW) directive. Bleeding off speed early
+    # usually dissolves the conflict without anyone stopping.
+    slow_speed_scale: 0.35
+
+    # --- Anti-starvation ------------------------------------------------------
+    # Strict priority alone starves the lowest-ranked robot in a busy aisle.
+    # After this long yielding continuously, the loser is temporarily lifted
+    # above the whole fleet [s].
+    max_yield_seconds: 12.0
+
+    # How long that inversion lasts [s]. Time-boxed so it cannot become the new
+    # steady state.
+    yield_cooldown_seconds: 4.0
+
+    # --- Timing ---------------------------------------------------------------
+    traffic_rate_hz: 10.0
+    trajectory_publish_rate_hz: 10.0
+
+    # A peer trajectory older than this is discarded. A stale prediction is
+    # worse than none because it still looks authoritative.
+    trajectory_timeout_seconds: 1.0

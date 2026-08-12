@@ -1,0 +1,1578 @@
+<?xml version="1.0" ?>
+<!--
+  GENERATED FILE - do not edit by hand.
+  Regenerate with:  ros2 run amr_gazebo generate_world.py
+  Source of truth:  amr_gazebo/amr_gazebo/world_builder.py
+-->
+<sdf version="1.6">
+  <world name="warehouse_multilevel">
+
+    <!-- A slightly reduced step size keeps the ramp contacts stable at the
+         accelerations the light scout is allowed to command. -->
+    <physics name="default_physics" default="true" type="ode">
+      <max_step_size>0.002</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>500</real_time_update_rate>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>75</iters>
+          <sor>1.3</sor>
+        </solver>
+        <constraints>
+          <cfm>0.0</cfm>
+          <erp>0.2</erp>
+          <contact_max_correcting_vel>100.0</contact_max_correcting_vel>
+          <contact_surface_layer>0.001</contact_surface_layer>
+        </constraints>
+      </ode>
+    </physics>
+
+    <gravity>0 0 -9.81</gravity>
+
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+      <background>0.75 0.78 0.82 1</background>
+      <shadows>false</shadows>
+    </scene>
+
+    <include><uri>model://sun</uri></include>
+    <include><uri>model://ground_plane</uri></include>
+
+    <!-- Exposes /gazebo/get_entity_state and /gazebo/set_entity_state, used by
+         the test harness to teleport robots to a scenario start pose. -->
+    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+      <ros><namespace>/gazebo</namespace></ros>
+      <update_rate>25.0</update_rate>
+    </plugin>
+
+
+    <!-- ===== Static structure ===== -->
+
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0.0000 -15.0000 1.5000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>44.2500 0.2500 3.0000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>44.2500 0.2500 3.0000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0.0000 15.0000 1.5000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>44.2500 0.2500 3.0000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>44.2500 0.2500 3.0000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_west">
+      <static>true</static>
+      <pose>-22.0000 0.0000 1.5000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.2500 30.2500 3.0000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.2500 30.2500 3.0000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="wall_east">
+      <static>true</static>
+      <pose>22.0000 0.0000 1.5000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.2500 30.2500 3.0000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.2500 30.2500 3.0000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="heavy_rack_0_0">
+      <static>true</static>
+      <pose>-18.7000 -12.4000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="heavy_rack_0_1">
+      <static>true</static>
+      <pose>-14.2000 -12.4000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="heavy_rack_0_2">
+      <static>true</static>
+      <pose>-9.7000 -12.4000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="heavy_rack_1_0">
+      <static>true</static>
+      <pose>-18.7000 -9.0000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="heavy_rack_1_1">
+      <static>true</static>
+      <pose>-14.2000 -9.0000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="heavy_rack_1_2">
+      <static>true</static>
+      <pose>-9.7000 -9.0000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="heavy_rack_2_0">
+      <static>true</static>
+      <pose>-18.7000 -5.6000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="heavy_rack_2_1">
+      <static>true</static>
+      <pose>-14.2000 -5.6000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="heavy_rack_2_2">
+      <static>true</static>
+      <pose>-9.7000 -5.6000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="general_rack_0_0">
+      <static>true</static>
+      <pose>-18.7000 5.6000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="general_rack_0_1">
+      <static>true</static>
+      <pose>-14.2000 5.6000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="general_rack_0_2">
+      <static>true</static>
+      <pose>-9.7000 5.6000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="general_rack_1_0">
+      <static>true</static>
+      <pose>-18.7000 9.0000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="general_rack_1_1">
+      <static>true</static>
+      <pose>-14.2000 9.0000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="general_rack_1_2">
+      <static>true</static>
+      <pose>-9.7000 9.0000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="general_rack_2_0">
+      <static>true</static>
+      <pose>-18.7000 12.4000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="general_rack_2_1">
+      <static>true</static>
+      <pose>-14.2000 12.4000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="general_rack_2_2">
+      <static>true</static>
+      <pose>-9.7000 12.4000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="buffer_rack_0_0">
+      <static>true</static>
+      <pose>6.8000 -12.4000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="buffer_rack_0_1">
+      <static>true</static>
+      <pose>11.3000 -12.4000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="buffer_rack_0_2">
+      <static>true</static>
+      <pose>15.8000 -12.4000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="buffer_rack_1_0">
+      <static>true</static>
+      <pose>6.8000 -9.0000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="buffer_rack_1_1">
+      <static>true</static>
+      <pose>11.3000 -9.0000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="buffer_rack_1_2">
+      <static>true</static>
+      <pose>15.8000 -9.0000 1.2000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6000 1.0000 2.4000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Wood</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="firewall_south">
+      <static>true</static>
+      <pose>0.0000 -7.9500 1.5000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.4000 13.9000 3.0000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.4000 13.9000 3.0000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/DarkGrey</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="firewall_mid">
+      <static>true</static>
+      <pose>0.0000 1.5000 1.5000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.4000 1.0000 3.0000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.4000 1.0000 3.0000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/DarkGrey</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="firewall_north">
+      <static>true</static>
+      <pose>0.0000 10.0500 1.5000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.4000 9.7000 3.0000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.4000 9.7000 3.0000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/DarkGrey</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="pinch_jamb_north">
+      <static>true</static>
+      <pose>0.0000 1.0500 0.6000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.6000 0.1200 1.2000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.6000 0.1200 1.2000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Yellow</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="pinch_jamb_south">
+      <static>true</static>
+      <pose>0.0000 -1.0500 0.6000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.6000 0.1200 1.2000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.6000 0.1200 1.2000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Yellow</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="hump_rail_north">
+      <static>true</static>
+      <pose>0.0000 5.2000 0.8000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.2000 0.1200 0.5000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.2000 0.1200 0.5000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Yellow</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="hump_rail_south">
+      <static>true</static>
+      <pose>0.0000 2.0000 0.8000 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.2000 0.1200 0.5000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.2000 0.1200 0.5000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Yellow</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="mezz_rail_north">
+      <static>true</static>
+      <pose>7.0000 13.6000 0.7250 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>10.0000 0.1200 0.5500</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>10.0000 0.1200 0.5500</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Yellow</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="mezz_rail_east">
+      <static>true</static>
+      <pose>12.0000 10.5500 0.7250 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.1200 6.1000 0.5500</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.1200 6.1000 0.5500</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Yellow</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="mezz_rail_west">
+      <static>true</static>
+      <pose>2.0000 10.5500 0.7250 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.1200 6.1000 0.5500</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.1200 6.1000 0.5500</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Yellow</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="mezz_rail_south_a">
+      <static>true</static>
+      <pose>3.7500 7.5000 0.7250 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.5000 0.1200 0.5500</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.5000 0.1200 0.5500</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Yellow</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="mezz_rail_south_b">
+      <static>true</static>
+      <pose>8.9000 7.5000 0.7250 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.8000 0.1200 0.5500</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.8000 0.1200 0.5500</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Yellow</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="mezz_rail_south_c">
+      <static>true</static>
+      <pose>11.8500 7.5000 0.7250 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.3000 0.1200 0.5500</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.3000 0.1200 0.5500</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Yellow</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="packing_divider_1">
+      <static>true</static>
+      <pose>19.0000 -8.0000 0.5500 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Blue</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="packing_divider_2">
+      <static>true</static>
+      <pose>19.0000 -4.0000 0.5500 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Blue</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="packing_divider_3">
+      <static>true</static>
+      <pose>19.0000 0.0000 0.5500 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Blue</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="packing_divider_4">
+      <static>true</static>
+      <pose>19.0000 4.0000 0.5500 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Blue</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="packing_divider_5">
+      <static>true</static>
+      <pose>19.0000 8.0000 0.5500 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Blue</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="packing_divider_6">
+      <static>true</static>
+      <pose>19.0000 12.0000 0.5500 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>5.0000 0.3000 1.1000</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Blue</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== Raised decks ===== -->
+
+    <model name="hump_deck">
+      <static>true</static>
+      <pose>0.0000 3.6000 0.2750 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.2000 3.2000 0.5500</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.2000 3.2000 0.5500</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/WoodPallet</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="mezzanine_deck">
+      <static>true</static>
+      <pose>7.0000 10.5500 0.2250 0 0 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>10.0000 6.1000 0.4500</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>10.0000 6.1000 0.4500</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/WoodPallet</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== Ramps ===== -->
+
+    <!-- hump_ramp_west: 8.7 deg incline -->
+    <model name="hump_ramp_west">
+      <static>true</static>
+      <pose>-3.3819 3.6000 0.1564 0.000000 -0.151605 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6418 3.0000 0.2400</size></box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode><mu>1.2</mu><mu2>1.0</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6418 3.0000 0.2400</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Bricks</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- hump_ramp_east: 8.7 deg incline -->
+    <model name="hump_ramp_east">
+      <static>true</static>
+      <pose>3.3819 3.6000 0.1564 0.000000 0.151605 0.000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.6418 3.0000 0.2400</size></box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode><mu>1.2</mu><mu2>1.0</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.6418 3.0000 0.2400</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Bricks</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- mezz_ramp_gentle: 7.8 deg incline -->
+    <model name="mezz_ramp_gentle">
+      <static>true</static>
+      <pose>7.0000 5.8662 0.1061 0.000000 -0.135528 1.570796</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>3.3305 3.0000 0.2400</size></box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode><mu>1.2</mu><mu2>1.0</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>3.3305 3.0000 0.2400</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Bricks</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- mezz_ramp_steep: 14.8 deg incline -->
+    <model name="mezz_ramp_steep">
+      <static>true</static>
+      <pose>10.5000 6.6807 0.1090 0.000000 -0.258771 1.570796</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box><size>1.7586 2.4000 0.2400</size></box>
+          </geometry>
+          <surface>
+            <friction>
+              <ode><mu>1.2</mu><mu2>1.0</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>1.7586 2.4000 0.2400</size></box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Bricks</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ===== Dynamic obstacles ===== -->
+
+    <model name="ped_0">
+      <pose>-14.0000 -7.3000 0.8750 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>70.00</mass>
+          <inertia>
+            <ixx>17.8646</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>17.8646</iyy><iyz>0</iyz>
+            <izz>3.5840</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Purple</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+
+      <!-- Holonomic drive so dynamic_obstacle_driver can steer it with a
+           plain Twist. Odometry is namespaced to keep the fleet TF tree
+           clean. -->
+      <plugin name="ped_0_move" filename="libgazebo_ros_planar_move.so">
+        <ros>
+          <namespace>/obstacles/ped_0</namespace>
+          <remapping>cmd_vel:=cmd_vel</remapping>
+          <remapping>odom:=odom</remapping>
+        </ros>
+        <update_rate>50</update_rate>
+        <publish_rate>10</publish_rate>
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>false</publish_odom_tf>
+        <odometry_frame>obstacles/ped_0/odom</odometry_frame>
+        <robot_base_frame>obstacles/ped_0/base_link</robot_base_frame>
+        <covariance_x>0.0001</covariance_x>
+        <covariance_y>0.0001</covariance_y>
+        <covariance_yaw>0.01</covariance_yaw>
+      </plugin>
+    </model>
+
+    <model name="ped_1">
+      <pose>-12.0000 7.3000 0.8750 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>70.00</mass>
+          <inertia>
+            <ixx>17.8646</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>17.8646</iyy><iyz>0</iyz>
+            <izz>3.5840</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Purple</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+
+      <!-- Holonomic drive so dynamic_obstacle_driver can steer it with a
+           plain Twist. Odometry is namespaced to keep the fleet TF tree
+           clean. -->
+      <plugin name="ped_1_move" filename="libgazebo_ros_planar_move.so">
+        <ros>
+          <namespace>/obstacles/ped_1</namespace>
+          <remapping>cmd_vel:=cmd_vel</remapping>
+          <remapping>odom:=odom</remapping>
+        </ros>
+        <update_rate>50</update_rate>
+        <publish_rate>10</publish_rate>
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>false</publish_odom_tf>
+        <odometry_frame>obstacles/ped_1/odom</odometry_frame>
+        <robot_base_frame>obstacles/ped_1/base_link</robot_base_frame>
+        <covariance_x>0.0001</covariance_x>
+        <covariance_y>0.0001</covariance_y>
+        <covariance_yaw>0.01</covariance_yaw>
+      </plugin>
+    </model>
+
+    <model name="ped_2">
+      <pose>8.0000 -3.0000 0.8750 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>70.00</mass>
+          <inertia>
+            <ixx>17.8646</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>17.8646</iyy><iyz>0</iyz>
+            <izz>3.5840</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Purple</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+
+      <!-- Holonomic drive so dynamic_obstacle_driver can steer it with a
+           plain Twist. Odometry is namespaced to keep the fleet TF tree
+           clean. -->
+      <plugin name="ped_2_move" filename="libgazebo_ros_planar_move.so">
+        <ros>
+          <namespace>/obstacles/ped_2</namespace>
+          <remapping>cmd_vel:=cmd_vel</remapping>
+          <remapping>odom:=odom</remapping>
+        </ros>
+        <update_rate>50</update_rate>
+        <publish_rate>10</publish_rate>
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>false</publish_odom_tf>
+        <odometry_frame>obstacles/ped_2/odom</odometry_frame>
+        <robot_base_frame>obstacles/ped_2/base_link</robot_base_frame>
+        <covariance_x>0.0001</covariance_x>
+        <covariance_y>0.0001</covariance_y>
+        <covariance_yaw>0.01</covariance_yaw>
+      </plugin>
+    </model>
+
+    <model name="ped_3">
+      <pose>3.0000 -2.0000 0.8750 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>70.00</mass>
+          <inertia>
+            <ixx>17.8646</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>17.8646</iyy><iyz>0</iyz>
+            <izz>3.5840</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Purple</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+
+      <!-- Holonomic drive so dynamic_obstacle_driver can steer it with a
+           plain Twist. Odometry is namespaced to keep the fleet TF tree
+           clean. -->
+      <plugin name="ped_3_move" filename="libgazebo_ros_planar_move.so">
+        <ros>
+          <namespace>/obstacles/ped_3</namespace>
+          <remapping>cmd_vel:=cmd_vel</remapping>
+          <remapping>odom:=odom</remapping>
+        </ros>
+        <update_rate>50</update_rate>
+        <publish_rate>10</publish_rate>
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>false</publish_odom_tf>
+        <odometry_frame>obstacles/ped_3/odom</odometry_frame>
+        <robot_base_frame>obstacles/ped_3/base_link</robot_base_frame>
+        <covariance_x>0.0001</covariance_x>
+        <covariance_y>0.0001</covariance_y>
+        <covariance_yaw>0.01</covariance_yaw>
+      </plugin>
+    </model>
+
+    <model name="thirdparty_0">
+      <pose>-8.0000 0.0000 0.2500 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>40.00</mass>
+          <inertia>
+            <ixx>0.8333</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>0.8333</iyy><iyz>0</iyz>
+            <izz>4.0500</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.900 0.900 0.500</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.900 0.900 0.500</size></box></geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Red</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+
+      <!-- Holonomic drive so dynamic_obstacle_driver can steer it with a
+           plain Twist. Odometry is namespaced to keep the fleet TF tree
+           clean. -->
+      <plugin name="thirdparty_0_move" filename="libgazebo_ros_planar_move.so">
+        <ros>
+          <namespace>/obstacles/thirdparty_0</namespace>
+          <remapping>cmd_vel:=cmd_vel</remapping>
+          <remapping>odom:=odom</remapping>
+        </ros>
+        <update_rate>50</update_rate>
+        <publish_rate>10</publish_rate>
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>false</publish_odom_tf>
+        <odometry_frame>obstacles/thirdparty_0/odom</odometry_frame>
+        <robot_base_frame>obstacles/thirdparty_0/base_link</robot_base_frame>
+        <covariance_x>0.0001</covariance_x>
+        <covariance_y>0.0001</covariance_y>
+        <covariance_yaw>0.01</covariance_yaw>
+      </plugin>
+    </model>
+
+    <model name="thirdparty_1">
+      <pose>10.0000 0.0000 0.2500 0 0 0</pose>
+      <link name="link">
+        <inertial>
+          <mass>40.00</mass>
+          <inertia>
+            <ixx>0.8333</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>0.8333</iyy><iyz>0</iyz>
+            <izz>4.0500</izz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.900 0.900 0.500</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.900 0.900 0.500</size></box></geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Red</name>
+            </script>
+          </material>
+        </visual>
+      </link>
+
+      <!-- Holonomic drive so dynamic_obstacle_driver can steer it with a
+           plain Twist. Odometry is namespaced to keep the fleet TF tree
+           clean. -->
+      <plugin name="thirdparty_1_move" filename="libgazebo_ros_planar_move.so">
+        <ros>
+          <namespace>/obstacles/thirdparty_1</namespace>
+          <remapping>cmd_vel:=cmd_vel</remapping>
+          <remapping>odom:=odom</remapping>
+        </ros>
+        <update_rate>50</update_rate>
+        <publish_rate>10</publish_rate>
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>false</publish_odom_tf>
+        <odometry_frame>obstacles/thirdparty_1/odom</odometry_frame>
+        <robot_base_frame>obstacles/thirdparty_1/base_link</robot_base_frame>
+        <covariance_x>0.0001</covariance_x>
+        <covariance_y>0.0001</covariance_y>
+        <covariance_yaw>0.01</covariance_yaw>
+      </plugin>
+    </model>
+
+  </world>
+</sdf>

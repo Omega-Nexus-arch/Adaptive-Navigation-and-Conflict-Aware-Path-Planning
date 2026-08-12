@@ -1,0 +1,16 @@
+# Scalability fixture: ten robots from the same two models, distinguished only
+# by roster entries. Proves the "expand to ten or more by changing a minimal
+# number of configuration parameters" requirement is real.
+fleet:
+  model_library: "models_good.yaml"
+  robots:
+    - {name: "amr1",  model: "heavy_test", x: -18.5, y:  4.0, yield_priority: 100}
+    - {name: "amr2",  model: "light_test", x: -18.5, y:  3.0, yield_priority:  90}
+    - {name: "amr3",  model: "light_test", x: -18.5, y:  2.0, yield_priority:  80}
+    - {name: "amr4",  model: "light_test", x: -18.5, y:  1.0, yield_priority:  70}
+    - {name: "amr5",  model: "heavy_test", x: -18.5, y:  0.0, yield_priority:  60}
+    - {name: "amr6",  model: "light_test", x: -18.5, y: -1.0, yield_priority:  50}
+    - {name: "amr7",  model: "light_test", x: -18.5, y: -2.0, yield_priority:  40}
+    - {name: "amr8",  model: "light_test", x: -18.5, y: -3.0, yield_priority:  30}
+    - {name: "amr9",  model: "heavy_test", x: -18.5, y: -4.0, yield_priority:  20}
+    - {name: "amr10", model: "light_test", x: -18.5, y: -5.0, yield_priority:  10}

@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>amr_sensor_bsp</name>
+  <version>1.0.0</version>
+  <description>
+    Board Support Package validation layer. Sensors publish to *_raw topics;
+    this package republishes validated copies on the plain topic names, and
+    nothing in the navigation stack subscribes to a raw topic. Includes the
+    per-model IMU angular-velocity plausibility check, camera content
+    validation, and IMU-informed ground-return rejection that keeps a 2D LiDAR
+    usable on the warehouse ramps.
+  </description>
+  <maintainer email="candidate@example.com">RSE Candidate</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>amr_core</depend>
+  <depend>amr_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_uncrustify</test_depend>
+  <test_depend>ament_cmake_cpplint</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

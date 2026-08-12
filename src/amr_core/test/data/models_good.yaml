@@ -1,0 +1,58 @@
+# Minimal but complete model library used by the amr_core unit tests.
+# Kept separate from the production robot_models.yaml so tuning the real robots
+# never breaks the tests, and vice versa.
+heavy_test:
+  human_name: "Heavy test unit"
+  role: "mapper"
+  chassis_length: 0.90
+  chassis_width: 0.62
+  wheel_radius: 0.115
+  wheel_separation: 0.58
+  footprint_radius: 0.55
+  inscribed_radius: 0.31
+  payload_capacity_kg: 120.0
+  max_vel_x: 0.75
+  min_vel_x: -0.35
+  max_vel_theta: 0.90
+  max_accel_x: 0.35
+  max_decel_x: 0.70
+  max_accel_theta: 0.80
+  max_jerk_x: 0.60
+  max_jerk_theta: 1.20
+  payload_derating: 0.55
+  speed_derating: 0.30
+  safety_k: 0.85
+  safety_d_min: 0.45
+  safety_release_hysteresis: 0.15
+  safety_sector_half_angle: 1.2217
+  yield_priority: 100
+  lidar: {height: 0.42, samples: 1080, range_min: 0.12, range_max: 25.0, rate: 15.0}
+  imu: {height: 0.20, rate: 100.0, max_angular_velocity: 2.50, max_linear_acceleration: 9.0}
+  camera: {height: 0.46, width: 848, height_px: 480, rate: 15.0}
+
+light_test:
+  human_name: "Light test unit"
+  role: "scout"
+  chassis_length: 0.58
+  chassis_width: 0.44
+  wheel_radius: 0.085
+  wheel_separation: 0.40
+  footprint_radius: 0.37
+  inscribed_radius: 0.22
+  payload_capacity_kg: 30.0
+  max_vel_x: 1.40
+  min_vel_x: -0.50
+  max_vel_theta: 1.90
+  max_accel_x: 1.10
+  max_decel_x: 1.60
+  max_accel_theta: 2.40
+  max_jerk_x: 2.50
+  max_jerk_theta: 4.00
+  payload_derating: 0.30
+  speed_derating: 0.20
+  safety_k: 0.42
+  safety_d_min: 0.30
+  yield_priority: 50
+  lidar: {height: 0.30, samples: 720, range_min: 0.08, range_max: 16.0, rate: 30.0}
+  imu: {height: 0.16, rate: 200.0, max_angular_velocity: 4.50, max_linear_acceleration: 14.0}
+  camera: {height: 0.32, width: 640, height_px: 360, rate: 30.0}

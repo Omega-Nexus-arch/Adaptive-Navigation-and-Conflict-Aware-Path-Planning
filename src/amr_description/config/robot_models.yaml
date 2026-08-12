@@ -1,0 +1,173 @@
+# =============================================================================
+# ROBOT MODEL LIBRARY
+# =============================================================================
+# One entry per *model* of robot (not per robot instance -- see
+# amr_bringup/config/fleet.yaml for the fleet roster).
+#
+# This file is the SINGLE SOURCE OF TRUTH for both:
+#   1. the xacro description  (amr_description/urdf/amr.urdf.xacro loads it via
+#      xacro.load_yaml, so geometry and Gazebo plugin settings come from here)
+#   2. the runtime C++ control stack (amr_fleet_control::RobotProfile parses the
+#      same numbers, so the motion smoother can never drift out of sync with
+#      the simulated physics)
+#
+# Adding a third robot model = appending one block here. No code changes.
+# =============================================================================
+
+heavy_mapper:
+  human_name: "AMR-1 Heavy Mapper / Lead"
+  role: "mapper"
+
+  # ---- Chassis geometry & inertia -----------------------------------------
+  chassis_length: 0.90
+  chassis_width: 0.62
+  chassis_height: 0.34
+  chassis_mass: 85.0
+  base_z_offset: 0.13          # base_link height above ground [m]
+
+  # ---- Drive train ---------------------------------------------------------
+  wheel_radius: 0.115
+  wheel_width: 0.075
+  wheel_mass: 3.5
+  wheel_separation: 0.58
+  caster_radius: 0.055
+  wheel_torque: 90.0
+
+  # ---- Payload -------------------------------------------------------------
+  payload_capacity_kg: 120.0   # HIGH payload -- lead / heavy storage duty
+
+  # ---- Dynamic envelope (unloaded) ----------------------------------------
+  # NOTE: the heavy unit is deliberately given LOWER acceleration and jerk
+  # limits than the scout. This is the physical-appropriateness requirement.
+  max_vel_x: 0.75
+  min_vel_x: -0.35
+  max_vel_theta: 0.90
+  max_accel_x: 0.35
+  max_decel_x: 0.70            # magnitude, applied as -max_decel_x
+  max_accel_theta: 0.80
+  max_jerk_x: 0.60
+  max_jerk_theta: 1.20
+
+  # Fraction by which accel/jerk limits shrink at 100% payload.
+  #   a_eff = a_max * (1 - payload_derating * load_ratio)
+  payload_derating: 0.55
+
+  # Fraction by which accel limits shrink at top speed (high-speed stability).
+  speed_derating: 0.30
+
+  # ---- Footprint -----------------------------------------------------------
+  footprint_radius: 0.55       # circumscribed, used by the conflict detector
+  inscribed_radius: 0.31
+
+  # ---- Safety envelope:  d_safe = k * v^2 + d_min --------------------------
+  safety_k: 0.85               # heavier => longer stopping distance
+  safety_d_min: 0.45
+  safety_release_hysteresis: 0.15
+  safety_sector_half_angle: 1.2217   # +/- 70 deg guarded cone [rad]
+
+  # ---- Traffic policy ------------------------------------------------------
+  # HIGHER priority wins a conflict. AMR-1 is mission-critical: it never yields
+  # to AMR-2. See amr_fleet_control/YieldPolicy.
+  yield_priority: 100
+
+  # ---- Sensors -------------------------------------------------------------
+  lidar:
+    height: 0.42
+    samples: 1080
+    min_angle: -3.14159
+    max_angle: 3.14159
+    range_min: 0.12
+    range_max: 25.0
+    rate: 15.0
+    noise_stddev: 0.012
+  imu:
+    height: 0.20
+    rate: 100.0
+    # Physically plausible limit for THIS model. The BSP validator warns when
+    # measured |omega| exceeds this. Sized as max_vel_theta plus margin.
+    max_angular_velocity: 2.50
+    max_linear_acceleration: 9.0
+    gyro_noise_stddev: 0.0004
+    accel_noise_stddev: 0.017
+  camera:
+    height: 0.46
+    width: 848
+    height_px: 480
+    rate: 15.0
+    hfov: 1.3962
+    min_mean_intensity: 6.0     # below => "blacked out" fault
+    max_mean_intensity: 249.0   # above => "saturated" fault
+
+  # ---- Appearance ----------------------------------------------------------
+  colour: [0.15, 0.35, 0.75, 1.0]
+
+# -----------------------------------------------------------------------------
+
+light_scout:
+  human_name: "AMR-2 Light Scout / Follower"
+  role: "scout"
+
+  chassis_length: 0.58
+  chassis_width: 0.44
+  chassis_height: 0.26
+  chassis_mass: 28.0
+  base_z_offset: 0.10
+
+  wheel_radius: 0.085
+  wheel_width: 0.050
+  wheel_mass: 1.2
+  wheel_separation: 0.40
+  caster_radius: 0.040
+  wheel_torque: 30.0
+
+  payload_capacity_kg: 30.0    # LOW payload -- speed over capacity
+
+  # Higher acceleration limits than the heavy mapper, per the brief.
+  max_vel_x: 1.40
+  min_vel_x: -0.50
+  max_vel_theta: 1.90
+  max_accel_x: 1.10
+  max_decel_x: 1.60
+  max_accel_theta: 2.40
+  max_jerk_x: 2.50
+  max_jerk_theta: 4.00
+
+  payload_derating: 0.30
+  speed_derating: 0.20
+
+  footprint_radius: 0.37
+  inscribed_radius: 0.22
+
+  safety_k: 0.42               # lighter => shorter stopping distance
+  safety_d_min: 0.30
+  safety_release_hysteresis: 0.12
+  safety_sector_half_angle: 1.3963   # +/- 80 deg guarded cone [rad]
+
+  yield_priority: 50           # yields to the heavy mapper
+
+  lidar:
+    height: 0.30
+    samples: 720
+    min_angle: -3.14159
+    max_angle: 3.14159
+    range_min: 0.08
+    range_max: 16.0
+    rate: 30.0                 # faster scan for dynamic obstacle avoidance
+    noise_stddev: 0.010
+  imu:
+    height: 0.16
+    rate: 200.0
+    max_angular_velocity: 4.50
+    max_linear_acceleration: 14.0
+    gyro_noise_stddev: 0.0003
+    accel_noise_stddev: 0.015
+  camera:
+    height: 0.32
+    width: 640
+    height_px: 360
+    rate: 30.0
+    hfov: 1.5708
+    min_mean_intensity: 6.0
+    max_mean_intensity: 249.0
+
+  colour: [0.85, 0.45, 0.10, 1.0]

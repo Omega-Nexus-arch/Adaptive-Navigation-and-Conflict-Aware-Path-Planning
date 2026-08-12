@@ -1,0 +1,5 @@
+fleet:
+  model_library: "models_good.yaml"
+  robots:
+    - {name: "amr1", model: "heavy_test"}
+    - {name: "amr2", model: "does_not_exist"}

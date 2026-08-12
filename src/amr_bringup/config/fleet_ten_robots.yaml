@@ -1,0 +1,45 @@
+# =============================================================================
+# TEN-ROBOT FLEET ROSTER
+# =============================================================================
+# GENERATED from config/fleet.yaml by scripts/make_large_fleet.py.
+#
+# This file exists to make the scalability claim checkable rather than
+# rhetorical. It is the two-robot roster with eight more entries appended and
+# nothing else changed - no new message, no new node, no launch-file edit.
+#
+#   ros2 launch amr_bringup fleet.launch.py \
+#       fleet_config:=$(ros2 pkg prefix amr_bringup)/share/amr_bringup/config/fleet_ten_robots.yaml
+#
+# Ten robots in one Gazebo world is heavy; the point is that the software
+# scales, not that a laptop does. amr_core's FleetConfigTest exercises this
+# roster shape directly in a unit test, which is the cheap way to check it.
+# =============================================================================
+
+fleet:
+  model_library: "../../amr_description/config/robot_models.yaml"
+  global_frame: "map"
+
+  robots:
+    - {name: "amr1", model: "heavy_mapper", x: -18.5, y: 4.0, yaw: 0.0, yield_priority: 100}
+    - {name: "amr2", model: "light_scout", x: -20.0, y: 4.0, yaw: 0.0, yield_priority: 90}
+    - {name: "amr3", model: "light_scout", x: -18.5, y: 2.4, yaw: 0.0, yield_priority: 80}
+    - {name: "amr4", model: "heavy_mapper", x: -20.0, y: 2.4, yaw: 0.0, yield_priority: 70}
+    - {name: "amr5", model: "light_scout", x: -18.5, y: 0.8, yaw: 0.0, yield_priority: 60}
+    - {name: "amr6", model: "light_scout", x: -20.0, y: 0.8, yaw: 0.0, yield_priority: 50}
+    - {name: "amr7", model: "heavy_mapper", x: -18.5, y: -0.8, yaw: 0.0, yield_priority: 40}
+    - {name: "amr8", model: "light_scout", x: -20.0, y: -0.8, yaw: 0.0, yield_priority: 30}
+    - {name: "amr9", model: "light_scout", x: -18.5, y: -2.4, yaw: 0.0, yield_priority: 20}
+    - {name: "amr10", model: "heavy_mapper", x: -20.0, y: -2.4, yaw: 0.0, yield_priority: 10}
+
+  policy:
+    horizon_seconds: 4.0
+    sample_period: 0.2
+    conflict_margin: 0.35
+    conflict_react_seconds: 3.0
+    hard_yield_seconds: 1.5
+    slow_speed_scale: 0.35
+    max_yield_seconds: 12.0
+    yield_cooldown_seconds: 4.0
+    traffic_rate_hz: 10.0
+    trajectory_publish_rate_hz: 10.0
+    trajectory_timeout_seconds: 1.0

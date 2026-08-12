@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!--
+  Model-library loader.
+
+  Reads amr_description/config/robot_models.yaml and exposes the block for the
+  requested model as the global xacro property `M`. Keeping the numbers in YAML
+  (rather than in xacro properties) lets the C++ control stack parse exactly the
+  same file, which is what stops the simulated physics and the motion smoother's
+  assumed limits from drifting apart.
+
+  An unknown model name raises a KeyError during xacro expansion, so a typo
+  fails the launch immediately instead of producing a silently wrong robot.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Resolve the substitution args into plain properties FIRST, so the
+       expression below operates on ordinary Python strings. -->
+  <xacro:property name="model_config_path" value="$(arg model_config)"/>
+  <xacro:property name="requested_model"   value="$(arg robot_model)"/>
+  <xacro:property name="robot_name"        value="$(arg robot_name)"/>
+
+  <!-- Every link/joint/frame is explicitly prefixed so that N robots can share
+       one TF tree without collisions. -->
+  <xacro:property name="prefix" value="${robot_name}/"/>
+
+  <xacro:property name="model_library" value="${xacro.load_yaml(model_config_path)}"/>
+  <xacro:property name="M" value="${model_library[requested_model]}"/>
+
+</robot>

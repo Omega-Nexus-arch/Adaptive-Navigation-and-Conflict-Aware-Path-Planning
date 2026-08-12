@@ -1,0 +1,24 @@
+<library path="amr_navigation_layers">
+
+  <class name="amr_navigation/SlopeLayer"
+         type="amr_navigation::SlopeLayer"
+         base_class_type="nav2_costmap_2d::Layer">
+    <description>
+      Prices terrain gradient from a static elevation field. Slopes below
+      free_angle_degrees cost nothing, slopes in between are charged on a
+      configurable curve so ramps are avoided when a flat route exists, and
+      slopes beyond the robot's climbing ability are lethal.
+    </description>
+  </class>
+
+  <class name="amr_navigation/FleetTrajectoryLayer"
+         type="amr_navigation::FleetTrajectoryLayer"
+         base_class_type="nav2_costmap_2d::Layer">
+    <description>
+      Writes peer robots' predicted future positions into the local costmap
+      with cost decaying over the prediction horizon, so the local planner
+      routes around where other robots are about to be.
+    </description>
+  </class>
+
+</library>

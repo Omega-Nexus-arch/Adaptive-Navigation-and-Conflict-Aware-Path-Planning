@@ -1,0 +1,5 @@
+fleet:
+  model_library: "models_good.yaml"
+  robots:
+    - {name: "amr1", model: "heavy_test", yield_priority: 100}
+    - {name: "amr1", model: "light_test", yield_priority: 50}

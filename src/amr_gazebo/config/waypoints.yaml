@@ -1,0 +1,59 @@
+# GENERATED FILE - regenerate with: ros2 run amr_gazebo generate_world.py
+#
+# Named goals in the shared `map` frame. Consumed by
+# amr_bringup/scripts/send_goals.py and demo_conflict.py.
+waypoints:
+  dock_a:
+    x: -18.5
+    y: 2.2
+    yaw: 0.000000
+    level: "ground"
+    description: "AMR-1 charging dock / start pose"
+  dock_b:
+    x: -18.5
+    y: 0.0
+    yaw: 0.000000
+    level: "ground"
+    description: "AMR-2 charging dock / start pose"
+  heavy_storage:
+    x: -17.5
+    y: -10.7
+    yaw: 3.141593
+    level: "ground"
+    description: "AMR-1 primary goal: deep aisle in the heavy rack block"
+  packing_bay_4:
+    x: 17.2
+    y: 2.0
+    yaw: 0.000000
+    level: "ground"
+    description: "AMR-2 primary goal: east-wall packing bay"
+  mezzanine_storage:
+    x: 7.0
+    y: 10.5
+    yaw: 0.000000
+    level: "mezzanine"
+    description: "Ramp-only goal: proves ramps are used when unavoidable"
+  east_staging:
+    x: 14.0
+    y: -6.5
+    yaw: 0.000000
+    level: "ground"
+    description: "East-side goal for the flat-doorway vs sloped-bridge test"
+  west_staging:
+    x: -14.0
+    y: -1.0
+    yaw: 0.000000
+    level: "ground"
+    description: "West-side counterpart for the slope experiment"
+  pinch_west:
+    x: -3.5
+    y: 0.0
+    yaw: 0.000000
+    level: "ground"
+    description: "West approach to The Pinch"
+  pinch_east:
+    x: 3.5
+    y: 0.0
+    yaw: 3.141593
+    level: "ground"
+    description: "East approach to The Pinch"

@@ -1,0 +1,22 @@
+# The safety envelope at top speed (0.9 * 4^2 + 0.5 = 14.9 m) exceeds the
+# LiDAR's 3 m reach, so the halt could never fire in time. Must be rejected.
+myopic:
+  role: "scout"
+  chassis_length: 0.5
+  chassis_width: 0.4
+  wheel_radius: 0.08
+  wheel_separation: 0.4
+  footprint_radius: 0.35
+  payload_capacity_kg: 20.0
+  max_vel_x: 4.0
+  max_vel_theta: 1.5
+  max_accel_x: 0.8
+  max_decel_x: 1.2
+  max_accel_theta: 1.5
+  max_jerk_x: 2.0
+  max_jerk_theta: 3.0
+  safety_k: 0.9
+  safety_d_min: 0.5
+  lidar: {height: 0.3, samples: 720, range_min: 0.08, range_max: 3.0, rate: 30.0}
+  imu: {height: 0.16, rate: 200.0, max_angular_velocity: 4.5, max_linear_acceleration: 14.0}
+  camera: {height: 0.32, width: 640, height_px: 360, rate: 30.0}

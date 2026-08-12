@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!-- Reusable inertia tensors. Solid-body approximations are adequate here and
+     keep the description readable; swap for CAD-derived tensors if available. -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="box_inertia" params="mass x y z *origin">
+    <inertial>
+      <xacro:insert_block name="origin"/>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${mass * (y*y + z*z) / 12.0}" ixy="0.0" ixz="0.0"
+        iyy="${mass * (x*x + z*z) / 12.0}" iyz="0.0"
+        izz="${mass * (x*x + y*y) / 12.0}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- Cylinder spinning about its local Y axis (wheel convention). -->
+  <xacro:macro name="wheel_inertia" params="mass radius width">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${mass * (3.0*radius*radius + width*width) / 12.0}" ixy="0.0" ixz="0.0"
+        iyy="${mass * radius * radius / 2.0}" iyz="0.0"
+        izz="${mass * (3.0*radius*radius + width*width) / 12.0}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="sphere_inertia" params="mass radius">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${mass}"/>
+      <inertia
+        ixx="${2.0 * mass * radius * radius / 5.0}" ixy="0.0" ixz="0.0"
+        iyy="${2.0 * mass * radius * radius / 5.0}" iyz="0.0"
+        izz="${2.0 * mass * radius * radius / 5.0}"/>
+    </inertial>
+  </xacro:macro>
+
+  <xacro:macro name="null_inertia" params="mass:=0.05">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${mass}"/>
+      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="1e-5" iyz="0.0" izz="1e-5"/>
+    </inertial>
+  </xacro:macro>
+
+</robot>

@@ -1,0 +1,169 @@
+<?xml version="1.0"?>
+<!--
+  Kinematic structure shared by every model in the fleet.
+
+  Differential drive: two powered wheels on the transverse axis plus two
+  passive spherical casters fore and aft. The caster pair (rather than a single
+  one) keeps the chassis stable while climbing the mezzanine ramps, which is
+  what makes the slope-cost experiment meaningful.
+
+  All macros are declared at file scope (not nested) so xacro expansion order
+  is unambiguous.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ====================================================================
+       Powered wheel
+       ==================================================================== -->
+  <xacro:macro name="drive_wheel"
+               params="prefix side reflect radius width mass separation z_off">
+    <link name="${prefix}${side}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2.0} 0 0"/>
+        <geometry><cylinder radius="${radius}" length="${width}"/></geometry>
+        <material name="${prefix}dark_material"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi/2.0} 0 0"/>
+        <geometry><cylinder radius="${radius}" length="${width}"/></geometry>
+      </collision>
+      <xacro:wheel_inertia mass="${mass}" radius="${radius}" width="${width}"/>
+    </link>
+
+    <joint name="${prefix}${side}_wheel_joint" type="continuous">
+      <parent link="${prefix}base_link"/>
+      <child  link="${prefix}${side}_wheel_link"/>
+      <origin xyz="0 ${reflect * separation / 2.0} ${z_off}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <dynamics damping="0.12" friction="0.05"/>
+    </joint>
+
+    <!-- High-grip rubber. Anisotropic friction (mu1 > mu2) resists lateral
+         slip on the ramps while still letting the differential drive turn. -->
+    <gazebo reference="${prefix}${side}_wheel_link">
+      <mu1>1.4</mu1>
+      <mu2>1.0</mu2>
+      <kp>1000000.0</kp>
+      <kd>100.0</kd>
+      <minDepth>0.001</minDepth>
+      <maxVel>1.0</maxVel>
+      <material>Gazebo/FlatBlack</material>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- ====================================================================
+       Passive caster
+       ==================================================================== -->
+  <xacro:macro name="caster_wheel" params="prefix side x_off radius z_off">
+    <link name="${prefix}${side}_caster_link">
+      <visual>
+        <geometry><sphere radius="${radius}"/></geometry>
+        <material name="${prefix}dark_material"/>
+      </visual>
+      <collision>
+        <geometry><sphere radius="${radius}"/></geometry>
+      </collision>
+      <xacro:sphere_inertia mass="0.4" radius="${radius}"/>
+    </link>
+
+    <joint name="${prefix}${side}_caster_joint" type="fixed">
+      <parent link="${prefix}base_link"/>
+      <child  link="${prefix}${side}_caster_link"/>
+      <origin xyz="${x_off} 0 ${z_off}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Near-frictionless so the caster slides instead of fighting the drive. -->
+    <gazebo reference="${prefix}${side}_caster_link">
+      <mu1>0.02</mu1>
+      <mu2>0.02</mu2>
+      <kp>1000000.0</kp>
+      <kd>100.0</kd>
+      <material>Gazebo/Grey</material>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- ====================================================================
+       Complete chassis
+       ==================================================================== -->
+  <xacro:macro name="amr_base" params="prefix m">
+
+    <xacro:property name="cl" value="${m['chassis_length']}"/>
+    <xacro:property name="cw" value="${m['chassis_width']}"/>
+    <xacro:property name="ch" value="${m['chassis_height']}"/>
+    <xacro:property name="cm" value="${m['chassis_mass']}"/>
+    <xacro:property name="wr" value="${m['wheel_radius']}"/>
+    <xacro:property name="ww" value="${m['wheel_width']}"/>
+    <xacro:property name="wm" value="${m['wheel_mass']}"/>
+    <xacro:property name="ws" value="${m['wheel_separation']}"/>
+    <xacro:property name="cr" value="${m['caster_radius']}"/>
+    <xacro:property name="bz" value="${m['base_z_offset']}"/>
+    <xacro:property name="col" value="${m['colour']}"/>
+
+    <material name="${prefix}body_material">
+      <color rgba="${col[0]} ${col[1]} ${col[2]} ${col[3]}"/>
+    </material>
+    <material name="${prefix}dark_material">
+      <color rgba="0.08 0.08 0.09 1.0"/>
+    </material>
+
+    <!-- base_footprint: ground-projected origin, the frame nav2 controls. -->
+    <link name="${prefix}base_footprint"/>
+
+    <joint name="${prefix}base_footprint_joint" type="fixed">
+      <parent link="${prefix}base_footprint"/>
+      <child  link="${prefix}base_link"/>
+      <origin xyz="0 0 ${bz}" rpy="0 0 0"/>
+    </joint>
+
+    <link name="${prefix}base_link">
+      <visual>
+        <origin xyz="0 0 ${ch/2.0}" rpy="0 0 0"/>
+        <geometry><box size="${cl} ${cw} ${ch}"/></geometry>
+        <material name="${prefix}body_material"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 ${ch/2.0}" rpy="0 0 0"/>
+        <geometry><box size="${cl} ${cw} ${ch}"/></geometry>
+      </collision>
+      <xacro:box_inertia mass="${cm}" x="${cl}" y="${cw}" z="${ch}">
+        <origin xyz="0 0 ${ch/2.0}" rpy="0 0 0"/>
+      </xacro:box_inertia>
+    </link>
+
+    <!-- Cargo deck: cosmetic, marks where payload rides. -->
+    <link name="${prefix}cargo_deck">
+      <visual>
+        <origin xyz="0 0 0.012" rpy="0 0 0"/>
+        <geometry><box size="${cl*0.8} ${cw*0.85} 0.024"/></geometry>
+        <material name="${prefix}dark_material"/>
+      </visual>
+      <xacro:null_inertia mass="0.5"/>
+    </link>
+    <joint name="${prefix}cargo_deck_joint" type="fixed">
+      <parent link="${prefix}base_link"/>
+      <child  link="${prefix}cargo_deck"/>
+      <origin xyz="0 0 ${ch}" rpy="0 0 0"/>
+    </joint>
+
+    <xacro:drive_wheel prefix="${prefix}" side="left"  reflect="1"
+                       radius="${wr}" width="${ww}" mass="${wm}"
+                       separation="${ws}" z_off="${wr - bz}"/>
+    <xacro:drive_wheel prefix="${prefix}" side="right" reflect="-1"
+                       radius="${wr}" width="${ww}" mass="${wm}"
+                       separation="${ws}" z_off="${wr - bz}"/>
+
+    <xacro:caster_wheel prefix="${prefix}" side="front"
+                        x_off="${cl * 0.36}"  radius="${cr}" z_off="${cr - bz}"/>
+    <xacro:caster_wheel prefix="${prefix}" side="rear"
+                        x_off="${-cl * 0.36}" radius="${cr}" z_off="${cr - bz}"/>
+
+    <gazebo reference="${prefix}base_link">
+      <material>Gazebo/Blue</material>
+    </gazebo>
+    <gazebo reference="${prefix}cargo_deck">
+      <material>Gazebo/FlatBlack</material>
+    </gazebo>
+
+  </xacro:macro>
+
+</robot>

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>amr_core</name>
+  <version>1.0.0</version>
+  <description>
+    Configuration and geometry foundation shared by every node in the AMR
+    stack. Turns the robot-model and fleet YAML files into validated C++
+    structs (RobotProfile, DynamicLimits, SafetySpec, FleetConfig) so no node
+    hard-codes a physical constant. Deliberately free of any rclcpp dependency
+    so the algorithmic layers built on it stay unit-testable.
+  </description>
+  <maintainer email="candidate@example.com">RSE Candidate</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>yaml_cpp_vendor</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_uncrustify</test_depend>
+  <test_depend>ament_cmake_cpplint</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<!--
+  Top-level robot description.
+
+  Usage:
+    xacro amr.urdf.xacro robot_name:=amr1 robot_model:=heavy_mapper
+
+  `robot_model` selects a block from config/robot_models.yaml. Both fleet
+  members - and any future member - come out of this one file.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="amr">
+
+  <xacro:arg name="robot_name"   default="amr1"/>
+  <xacro:arg name="robot_model"  default="heavy_mapper"/>
+  <xacro:arg name="model_config"
+             default="$(find amr_description)/config/robot_models.yaml"/>
+
+  <xacro:include filename="$(find amr_description)/urdf/robot_models.xacro"/>
+  <xacro:include filename="$(find amr_description)/urdf/inertials.xacro"/>
+  <xacro:include filename="$(find amr_description)/urdf/amr_base.xacro"/>
+  <xacro:include filename="$(find amr_description)/urdf/sensors.xacro"/>
+  <xacro:include filename="$(find amr_description)/urdf/amr.gazebo.xacro"/>
+
+  <!-- `prefix` and `M` are defined by robot_models.xacro. -->
+  <xacro:amr_base prefix="${prefix}" m="${M}"/>
+
+  <xacro:amr_lidar  prefix="${prefix}" robot_name="${robot_name}"
+                    cfg="${M['lidar']}"  base_height="${M['base_z_offset']}"/>
+
+  <xacro:amr_imu    prefix="${prefix}" robot_name="${robot_name}"
+                    cfg="${M['imu']}"    base_height="${M['base_z_offset']}"/>
+
+  <xacro:amr_camera prefix="${prefix}" robot_name="${robot_name}"
+                    cfg="${M['camera']}" base_height="${M['base_z_offset']}"
+                    body_length="${M['chassis_length']}"/>
+
+  <xacro:amr_gazebo_control prefix="${prefix}" robot_name="${robot_name}" m="${M}"/>
+
+</robot>

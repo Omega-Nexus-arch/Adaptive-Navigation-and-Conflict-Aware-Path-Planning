@@ -1,0 +1,8 @@
+# Inject a payload change at runtime to demonstrate the dynamic-state
+# dependent acceleration envelope without needing a real load cell.
+float64 payload_kg
+---
+bool success
+float64 accepted_payload_kg
+float64 load_ratio
+string message

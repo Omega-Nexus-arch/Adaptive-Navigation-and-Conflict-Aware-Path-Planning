@@ -1,0 +1,21 @@
+# GENERATED FILE - regenerate with: ros2 run amr_gazebo generate_world.py
+#
+# Elevation field for amr_navigation::SlopeLayer.
+#
+# Pixel value v in [0, 255] decodes to a floor height of
+#     z = elevation_min + v * (elevation_max - elevation_min) / 255
+#
+# Geometry keys mirror nav2_map_server's map.yaml so the same image loader and
+# origin convention can be reused.
+image: warehouse_elevation.pgm
+resolution: 0.05
+origin: [-22.0, -15.0, 0.0]
+negate: 0
+occupied_thresh: 0.99
+free_thresh: 0.01
+mode: raw
+
+elevation_min: 0.0
+elevation_max: 0.69
+width: 880
+height: 600

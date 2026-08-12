@@ -1,0 +1,32 @@
+# GENERATED FILE - regenerate with: ros2 run amr_gazebo generate_world.py
+#
+# Patrol loops for amr_gazebo/dynamic_obstacle_driver.py. Each obstacle
+# is a real Gazebo model with collision geometry, so the fleet
+# genuinely has to sense and avoid it.
+dynamic_obstacle_driver:
+  ros__parameters:
+    obstacle_names: ["ped_0", "ped_1", "ped_2", "ped_3", "thirdparty_0", "thirdparty_1"]
+    ped_0:
+      speed: 0.9
+      kind: "cylinder"
+      waypoints: [-14.0, -7.3, -6.0, -7.3, -6.0, -3.8, -14.0, -3.8]
+    ped_1:
+      speed: 0.75
+      kind: "cylinder"
+      waypoints: [-12.0, 7.3, -12.0, 10.7, -18.0, 10.7, -18.0, 7.3]
+    ped_2:
+      speed: 1.05
+      kind: "cylinder"
+      waypoints: [8.0, -3.0, 16.0, -3.0, 16.0, 3.0, 8.0, 3.0]
+    ped_3:
+      speed: 0.85
+      kind: "cylinder"
+      waypoints: [3.0, -2.0, 3.0, 2.0, 8.0, 2.0, 8.0, -2.0]
+    thirdparty_0:
+      speed: 0.7
+      kind: "box"
+      waypoints: [-8.0, 0.0, -8.0, -4.0, -16.0, -4.0, -16.0, 0.0]
+    thirdparty_1:
+      speed: 0.8
+      kind: "box"
+      waypoints: [10.0, 0.0, 16.0, 0.0, 16.0, 5.5, 10.0, 5.5]

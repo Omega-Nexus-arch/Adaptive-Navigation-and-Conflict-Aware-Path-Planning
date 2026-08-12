@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>amr_fleet_control</name>
+  <version>1.0.0</version>
+  <description>
+    Multi-robot motion and traffic control: a payload- and speed-aware
+    jerk-limited velocity smoother, a low-latency speed-dependent safety
+    override, forward trajectory prediction, and a centralised conflict-aware
+    traffic controller implementing a priority-based yielding protocol.
+
+    Every algorithm is a plain C++ class free of rclcpp, with the ROS nodes as
+    thin adapters, so the control laws are unit-tested directly rather than
+    through a simulator.
+  </description>
+  <maintainer email="candidate@example.com">RSE Candidate</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>amr_core</depend>
+  <depend>amr_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_uncrustify</test_depend>
+  <test_depend>ament_cmake_cpplint</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,13 @@
+fleet:
+  model_library: "models_good.yaml"
+  global_frame: "map"
+  policy:
+    horizon_seconds: 4.0
+    sample_period: 0.2
+    conflict_margin: 0.35
+    conflict_react_seconds: 3.0
+    hard_yield_seconds: 1.5
+    slow_speed_scale: 0.35
+  robots:
+    - {name: "amr1", model: "heavy_test", x: -18.5, y: 2.2, yaw: 0.0}
+    - {name: "amr2", model: "light_test", x: -18.5, y: 0.0, yaw: 0.0}
