@@ -72,7 +72,14 @@ heavy_mapper:
 
   # ---- Sensors -------------------------------------------------------------
   lidar:
-    height: 0.42
+    # ABOVE THE CARGO DECK, ON A MAST. base_z_offset + chassis_height + deck
+    # = 0.13 + 0.34 + 0.024 = 0.494 m, so anything at or below that is INSIDE
+    # the robot's own collision box and the ray sensor hits the chassis walls
+    # at 0.31-0.45 m -- well beyond range_min, so they arrive as genuine
+    # obstacles. SLAM then maps a 0.9 x 0.6 m box, inflation makes the robot's
+    # own cell inscribed-lethal, and every plan fails with "Starting point in
+    # lethal space". See DESIGN_NOTES 8d. Checked by test_sensor_placement.py.
+    height: 0.60
     samples: 1080
     min_angle: -3.14159
     max_angle: 3.14159
@@ -90,7 +97,7 @@ heavy_mapper:
     gyro_noise_stddev: 0.0004
     accel_noise_stddev: 0.017
   camera:
-    height: 0.46
+    height: 0.40
     width: 848
     height_px: 480
     rate: 15.0
@@ -146,7 +153,9 @@ light_scout:
   yield_priority: 50           # yields to the heavy mapper
 
   lidar:
-    height: 0.30
+    # Above this model's cargo deck (0.10 + 0.26 + 0.024 = 0.384 m); see the
+    # note on heavy_mapper's lidar height.
+    height: 0.48
     samples: 720
     min_angle: -3.14159
     max_angle: 3.14159
@@ -162,7 +171,7 @@ light_scout:
     gyro_noise_stddev: 0.0003
     accel_noise_stddev: 0.015
   camera:
-    height: 0.32
+    height: 0.28
     width: 640
     height_px: 360
     rate: 30.0

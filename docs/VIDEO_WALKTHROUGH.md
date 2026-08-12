@@ -34,7 +34,7 @@ Have `docs/REQUIREMENTS.md` and `docs/REFACTORING.md` open in a browser tab.
 > local planning with a yielding protocol, and a low-latency safety override.
 >
 > The thing I'd most like you to take away is that these are tested rather than
-> demonstrated — 243 automated tests, and the demo scripts exit non-zero if the
+> demonstrated — 250 automated tests, and the demo scripts exit non-zero if the
 > behaviour they check isn't there."
 
 **Shot:** the repository tree, then `docs/REQUIREMENTS.md` scrolled once.

@@ -70,6 +70,23 @@ def main():
             notes.append(
                 f'{name}: d_safe(v_max) = {d_safe:.2f} m within {reach:.1f} m LiDAR reach')
 
+        # A 2D scanner mounted at or below the top of the chassis sees only its
+        # own chassis: Gazebo ray sensors collide with their own model. The
+        # symptoms surface as "Starting point in lethal space", never as
+        # anything mentioning the LiDAR. See DESIGN_NOTES 8d.
+        deck_top = (float(model['base_z_offset']) +
+                    float(model['chassis_height']) + 0.024)
+        lidar_z = float(model['lidar']['height'])
+        if lidar_z < deck_top + 0.03:
+            problems.append(
+                f"{name}: LiDAR at {lidar_z:.3f} m sits inside its own chassis "
+                f"(collision reaches {deck_top:.3f} m); every beam would hit the "
+                f"robot itself and no plan could ever start")
+        else:
+            notes.append(
+                f'{name}: scan plane {lidar_z:.2f} m clears the body top '
+                f'{deck_top:.2f} m by {lidar_z - deck_top:.2f} m')
+
         omega_limit = float(model['imu']['max_angular_velocity'])
         if omega_limit <= float(model['max_vel_theta']):
             problems.append(

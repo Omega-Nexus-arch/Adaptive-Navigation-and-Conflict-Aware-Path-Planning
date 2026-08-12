@@ -24,8 +24,12 @@
   <!-- `prefix` and `M` are defined by robot_models.xacro. -->
   <xacro:amr_base prefix="${prefix}" m="${M}"/>
 
+  <!-- deck_height: top of the cargo deck in world coordinates. The lidar
+       macro needs it to size its mast, and to place the scanner ABOVE the
+       robot's own collision geometry rather than inside it. -->
   <xacro:amr_lidar  prefix="${prefix}" robot_name="${robot_name}"
-                    cfg="${M['lidar']}"  base_height="${M['base_z_offset']}"/>
+                    cfg="${M['lidar']}"  base_height="${M['base_z_offset']}"
+                    deck_height="${M['base_z_offset'] + M['chassis_height'] + 0.024}"/>
 
   <xacro:amr_imu    prefix="${prefix}" robot_name="${robot_name}"
                     cfg="${M['imu']}"    base_height="${M['base_z_offset']}"/>

@@ -30,7 +30,17 @@ slam_toolbox:
     transform_publish_period: 0.02
     map_update_interval: 1.0
     resolution: 0.05
-    minimum_laser_range: 0.12
+    # slam_toolbox's keys are `min_laser_range` / `max_laser_range`. The
+    # misspelling `minimum_laser_range` that used to be here was accepted
+    # silently and left the default 0.0 in place -- the exact silent-defaulting
+    # failure REFACTORING.md section 1 is about. The runtime warning
+    # "minimum laser range setting (0.0 m) exceeds the capabilities of the used
+    # Lidar (0.12 m)" was the only evidence.
+    #
+    # Both values are overwritten per robot from robot_models.yaml in
+    # slam.launch.py; these are placeholders. A 20 m default on a 25 m scanner
+    # silently discards a fifth of its useful range.
+    min_laser_range: 0.12
     max_laser_range: 20.0
     minimum_time_interval: 0.3
     transform_timeout: 0.2

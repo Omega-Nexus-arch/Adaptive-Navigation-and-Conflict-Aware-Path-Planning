@@ -40,6 +40,9 @@ if(BUILD_TESTING)
   # Guards against a Node subclass shadowing a read-only rclpy property, which
   # raises only when the constructor runs. See DESIGN_NOTES 8c.
   ament_add_pytest_test(node_shadowing_test test/test_node_attribute_shadowing.py)
+  # Guards sensor mounting: a scanner inside its own chassis sees only the
+  # chassis, and every symptom points elsewhere. See DESIGN_NOTES 8d.
+  ament_add_pytest_test(sensor_placement_test test/test_sensor_placement.py)
 endif()
 
 ament_package()

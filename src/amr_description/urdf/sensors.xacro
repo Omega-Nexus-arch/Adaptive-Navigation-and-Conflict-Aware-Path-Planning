@@ -13,15 +13,42 @@
   <!-- ====================================================================
        2D LiDAR
        ==================================================================== -->
-  <xacro:macro name="amr_lidar" params="prefix robot_name cfg base_height">
+  <xacro:macro name="amr_lidar" params="prefix robot_name cfg base_height deck_height">
+    <!-- The mast that lifts the scanner clear of the cargo deck.
+
+         A 2D scanner mounted at or below deck height is not a scanner: a
+         Gazebo ray sensor collides with its OWN model's links, so every beam
+         terminates on the chassis wall a few tens of centimetres out - beyond
+         range_min, therefore indistinguishable from a real obstacle. See
+         DESIGN_NOTES 8d.
+
+         The mast is visual-only on purpose. Giving it collision geometry would
+         put a solid body at the beam origin; the returns would fall below
+         range_min and be discarded, but relying on that is a coincidence, not
+         a design. No collision means no possible self-hit. -->
+    <link name="${prefix}lidar_mast">
+      <visual>
+        <origin xyz="0 0 ${(cfg['height'] - deck_height) / 2.0}" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.028" length="${cfg['height'] - deck_height}"/></geometry>
+        <material name="${prefix}dark_material"/>
+      </visual>
+      <xacro:null_inertia mass="0.25"/>
+    </link>
+
+    <joint name="${prefix}lidar_mast_joint" type="fixed">
+      <parent link="${prefix}base_link"/>
+      <child  link="${prefix}lidar_mast"/>
+      <origin xyz="0 0 ${deck_height - base_height}" rpy="0 0 0"/>
+    </joint>
+
     <link name="${prefix}lidar_link">
       <visual>
         <geometry><cylinder radius="0.045" length="0.05"/></geometry>
         <material name="${prefix}dark_material"/>
       </visual>
-      <collision>
-        <geometry><cylinder radius="0.045" length="0.05"/></geometry>
-      </collision>
+      <!-- No collision element. The scanner's own housing sits exactly at the
+           beam origin; a collision shell of radius 0.045 m would be struck by
+           every beam of any model whose range_min is below that. -->
       <xacro:null_inertia mass="0.18"/>
     </link>
 
@@ -142,7 +169,10 @@
     <joint name="${prefix}camera_joint" type="fixed">
       <parent link="${prefix}base_link"/>
       <child  link="${prefix}camera_link"/>
-      <origin xyz="${body_length / 2.0} 0 ${cfg['height'] - base_height}" rpy="0 0 0"/>
+      <!-- 2 cm proud of the front face. Flush with it would bury the lens
+           inside the chassis collision box, so the near plane starts inside
+           solid geometry. -->
+      <origin xyz="${body_length / 2.0 + 0.02} 0 ${cfg['height'] - base_height}" rpy="0 0 0"/>
     </joint>
 
     <!-- REP-103 optical frame (z forward, x right, y down). -->

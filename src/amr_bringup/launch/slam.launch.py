@@ -9,6 +9,7 @@ pushes it), so every topic and frame here is relative.
 import os
 
 from ament_index_python.packages import get_package_share_directory
+from amr_bringup.fleet_loader import load_fleet
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
@@ -21,6 +22,16 @@ def _slam_nodes(context, *args, **kwargs):
     fleet_config = LaunchConfiguration('fleet_config').perform(context)
     bringup_share = get_package_share_directory('amr_bringup')
 
+    # The scanner's real limits, from the same file the URDF reads. Left to
+    # slam_toolbox's defaults (0.0 / 20.0 m) the heavy mapper's 25 m scanner
+    # would be truncated to 20 m and every return inside 0.12 m treated as
+    # valid.
+    fleet = load_fleet(fleet_config)
+    matches = [r for r in fleet['robots'] if r['name'] == robot_name]
+    if not matches:
+        raise RuntimeError(f"robot '{robot_name}' is not in {fleet_config}")
+    lidar = matches[0]['model_properties']['lidar']
+
     # Each robot owns a private map frame; amr_mapping anchors it into the
     # shared one. Frames are prefixed to match the URDF.
     slam_params = RewrittenYaml(
@@ -31,6 +42,9 @@ def _slam_nodes(context, *args, **kwargs):
             'base_frame': f'{robot_name}/base_footprint',
             'odom_frame': f'{robot_name}/odom',
             'map_frame': f'{robot_name}/map',
+            'min_laser_range': str(float(lidar['range_min'])),
+            'max_laser_range': str(float(lidar['range_max'])),
+            'resolution': str(float(fleet['map_extents']['resolution'])),
         },
         convert_types=True,
     )

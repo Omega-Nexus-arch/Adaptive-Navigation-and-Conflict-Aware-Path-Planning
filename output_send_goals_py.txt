@@ -1,0 +1,10 @@
+[INFO] [1786562086.024737474] [send_goals]: waiting for amr1 navigate_to_pose...
+[INFO] [1786562086.025609879] [send_goals]: amr1 -> heavy_storage at (-17.50, -10.70, 180 deg)
+[INFO] [1786562086.026375846] [send_goals]: waiting for amr2 navigate_to_pose...
+[INFO] [1786562086.027005709] [send_goals]: amr2 -> packing_bay_4 at (17.20, 2.00, 0 deg)
+[INFO] [1786562086.028816513] [send_goals]: amr1: goal accepted
+[INFO] [1786562086.029335009] [send_goals]: amr2: goal accepted
+[ERROR] [1786562107.241709168] [send_goals]: amr2: failed (status 6)
+[ERROR] [1786562107.254843169] [send_goals]: amr1: failed (status 6)
+[ERROR] [1786562107.255614757] [send_goals]: FAILED: amr1, amr2
+[ros2run]: Interrupt

@@ -52,7 +52,7 @@ colcon test --event-handlers console_direct+
 colcon test-result --verbose
 ```
 
-**Check:** 243 tests, 0 failures. This alone validates the motion smoother, the
+**Check:** 250 tests, 0 failures. This alone validates the motion smoother, the
 safety envelope, conflict detection, the yielding protocol, the sensor
 validators, selective mapping, map fusion, the slope cost model, the world
 geometry and every config loader.
@@ -358,6 +358,9 @@ milliseconds.
 | `merged map: 0.0% explored` | (read map_fusion's ERROR line) | It now prints the evidence bounding box against the grid extent, which names the offset directly. |
 | `AttributeError: can't set attribute` from a script | - | A `Node` subclass assigned to one of rclpy's read-only properties (`clients`, `publishers`, `timers`...). Rename it; `test_node_attribute_shadowing.py` rejects all of them. |
 | Goals accepted but the robot doesn't move | `ros2 topic echo /amr1/safety_status --once` | `halt_active: true` means the override is holding it. That is the override working, not nav2 failing. |
+| `Starting point in lethal space!` | `ros2 topic echo /amr1/scan --once \| head -20` | If the ranges are all ~0.3 m the scanner is inside its own chassis and SLAM is mapping the robot. `lidar.height` must clear `base_z_offset + chassis_height + 0.024`. See DESIGN_NOTES 8d. |
+| `map geometry changed to 19x13` (a tiny map) | `ros2 run amr_bringup check_model_consistency.py` | Same cause. Compare the map's metres against the chassis dimensions -- if they match, the LiDAR is seeing the robot. |
+| `minimum laser range setting (0.0 m) exceeds...` | - | The key is `min_laser_range`, not `minimum_laser_range`. Fixed, and now derived per robot from `robot_models.yaml`. |
 | `colcon test` fails but gtest/pytest all pass | `colcon test-result --verbose \| grep -E 'gtest\|pytest'` | Only the style linters failed. Run `ament_uncrustify --reformat` in the package. |
 
 ---

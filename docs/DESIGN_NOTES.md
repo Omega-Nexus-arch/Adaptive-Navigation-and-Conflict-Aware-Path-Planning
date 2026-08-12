@@ -696,11 +696,92 @@ is not vigilance; it is a check that enumerates the base class and compares.
 
 ---
 
+## 8d. A scanner that could only see itself
+
+**Symptom.** Both robots accept their goals and neither moves. The planner
+says:
+
+```
+[amr1.planner_server]: GridBased: failed to create plan, invalid use:
+                       Starting point in lethal space! Cannot create feasible plan..
+[send_goals]: amr1: failed (status 6)
+```
+
+Everything upstream looked healthy: TF connected, the global costmap resized to
+960 x 680, `map_fusion` anchoring both robots, nav2 fully activated.
+
+**The tell was two lines that read like startup noise:**
+
+```
+[amr1.selective_mapping]: map geometry changed to 19x13 at 0.050 m/cell
+[amr2.selective_mapping]: map geometry changed to 13x10 at 0.050 m/cell
+```
+
+19 x 13 cells at 0.05 m is **0.95 x 0.65 m**. The heavy mapper's chassis is
+0.90 x 0.62 m. 13 x 10 is 0.65 x 0.50 m; the scout's chassis is 0.58 x 0.44 m.
+Both maps are the robot's own body, to within a cell.
+
+**Cause.** A Gazebo ray sensor collides with its own model's links. The LiDAR
+was mounted at 0.42 m; the chassis collision box runs from `base_z_offset`
+(0.13) to `base_z_offset + chassis_height` (0.47), with the cargo deck on top
+of that at 0.494. **The scanner was inside the robot.** Every beam terminated
+on a chassis wall at 0.31-0.45 m -- far beyond `range_min` (0.12 m), so nothing
+filtered them and they arrived as ordinary obstacles.
+
+From there the failure propagates through four components, none of which
+mentions the LiDAR:
+
+1. slam_toolbox maps a chassis-sized box and nothing else;
+2. the merged map stalls at 0.1% explored;
+3. the inflation layer turns that ring of self-hits into
+   `INSCRIBED_INFLATED_OBSTACLE` (253) at the robot's own cell;
+4. Smac's `Node2D::isNodeValid` rejects any cost >= 253, so the **start pose**
+   is invalid -- "Starting point in lethal space". nav2 runs its recoveries,
+   they hit the same phantom obstacles ("Collision Ahead - Exiting Spin"), and
+   the goal aborts with status 6.
+
+**Fix.** Put the scanner on a mast above the cargo deck: 0.60 m for the heavy
+mapper, 0.48 m for the scout, both with ~0.10 m of clearance. The mast and the
+scanner housing are **visual-only** -- collision geometry at the beam origin
+would be a self-hit waiting for a model whose `range_min` is smaller.
+
+Two things fixed in the same pass, both found by reading that log properly:
+
+* `slam_toolbox.yaml` said `minimum_laser_range`. slam_toolbox's parameter is
+  `min_laser_range`. The misspelling was accepted silently and the default 0.0
+  applied -- the exact silent-defaulting failure REFACTORING.md section 1 is
+  about, sitting in this project's own config. The only evidence was a warning
+  that read like advice: *"minimum laser range setting (0.0 m) exceeds the
+  capabilities of the used Lidar (0.1 m)"*. Both bounds now come from
+  `robot_models.yaml` per robot, so the heavy mapper stops having its 25 m
+  scanner truncated to slam_toolbox's 20 m default.
+* The camera was flush with the chassis front face, so its near plane began
+  inside solid geometry. It now sits 2 cm proud.
+
+**What stops it recurring.** `test_sensor_placement.py` computes the top of
+each model's collision geometry from `robot_models.yaml` and requires the scan
+plane to clear it, so a new robot model is covered the moment it is added. It
+also asserts the reason the clearance is needed -- the nearest chassis wall is
+always further out than `range_min`, so a self-hit can never be filtered -- and
+that neither the mast nor the scanner housing has collision geometry.
+`check_model_consistency.py` performs the same check before Gazebo starts.
+
+**The transferable lesson.** The four components between the cause and the
+symptom were each behaving correctly. SLAM mapped what it was told; inflation
+inflated what it was given; the planner refused an invalid start. A message
+that accurately describes a component's own state can still be useless, because
+its *cause* is three components upstream. What actually located this was a
+dimension check: 19 x 13 cells is 0.95 x 0.65 m, and something on the robot is
+0.90 x 0.62 m. **When a symptom is a number, compare it against the physical
+quantities in the system before reading any more logs.**
+
+---
+
 ## 9. What I would do next
 
 Honest gaps, roughly in the order I would close them.
 
-1. **Integration tests under `launch_testing`.** The 243 automated tests cover the
+1. **Integration tests under `launch_testing`.** The 250 automated tests cover the
    algorithms thoroughly and the node wiring not at all. A `launch_testing`
    suite that brings up two robots headless and asserts on `/cmd_vel` and
    `/fleet/traffic_directives` would cover the seam between them.
