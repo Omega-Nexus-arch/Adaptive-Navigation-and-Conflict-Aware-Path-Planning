@@ -183,7 +183,34 @@ global_costmap:
       global_frame: map
       robot_base_frame: <ns>/base_footprint
       robot_radius: 0.55
-      resolution: 0.05
+      rolling_window: false
+
+      # Sized and placed from `map_extents:` in the fleet roster, so this grid
+      # and the fused map map_fusion publishes are the same rectangle by
+      # construction.
+      #
+      # These lines are not cosmetic. nav2's defaults are 5 x 5 m at the
+      # origin, and a non-rolling costmap only resizes when its static layer
+      # receives a map. Every robot here spawns near x = -18.5, so between
+      # planner_server activating and the first `/map` arriving the planner
+      # logs
+      #
+      #     [nav2_costmap_2d]: Robot is out of bounds of the costmap!
+      #
+      # once per update cycle -- and keeps logging it indefinitely if map
+      # fusion is not running, which is the case when someone launches a single
+      # robot with `fleet_services:=false` to isolate a problem.
+      #
+      # The <map_*> placeholders are substituted textually in
+      # navigation.launch.py. They cannot go through RewrittenYaml: that
+      # matches on key name, and `width`/`height`/`resolution` also appear in
+      # the rolling local costmap below, which must stay 8 x 8 m.
+      width: <map_width>
+      height: <map_height>
+      origin_x: <map_origin_x>
+      origin_y: <map_origin_y>
+      resolution: <map_resolution>
+
       track_unknown_space: true
       # `slope` sits between the map and the inflation, so terrain cost is
       # inflated like any other cost and the planner keeps clear of ramp edges.

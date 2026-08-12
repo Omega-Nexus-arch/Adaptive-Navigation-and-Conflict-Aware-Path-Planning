@@ -51,7 +51,22 @@
         <odometry_topic>odom</odometry_topic>
         <odometry_frame>${prefix}odom</odometry_frame>
         <robot_base_frame>${prefix}base_footprint</robot_base_frame>
-        <odometry_source>1</odometry_source>
+        <!-- 0 = ENCODER, 1 = WORLD. This MUST stay 0, for two reasons.
+
+             Correctness. With WORLD, the plugin publishes Gazebo's ground-truth
+             pose as odometry, so `<robot>/odom -> <robot>/base_footprint`
+             already contains the spawn pose. slam_toolbox anchors its map frame
+             there, and amr_mapping's fusion node adds the roster's initial pose
+             a *second* time. A robot spawned at (-18.5, 2.2) ends up at
+             (-37.0, 4.4) in the shared `map` frame: outside the global costmap
+             ("Robot is out of bounds of the costmap!") and outside the merged
+             grid, so every map contribution is silently discarded.
+             See DESIGN_NOTES 8b.
+
+             Honesty. Ground-truth odometry would mean SLAM never has to close a
+             loop or correct a drift, which makes a cooperative-SLAM exercise
+             measure nothing. Encoder odometry drifts, which is why SLAM exists. -->
+        <odometry_source>0</odometry_source>
       </plugin>
     </gazebo>
 

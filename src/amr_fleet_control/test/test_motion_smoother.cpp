@@ -142,7 +142,8 @@ TEST(MotionSmootherTest, ClampsTargetsBeyondTheVelocityEnvelope) {
   MotionSmoother smoother(profile);
   const Trace trace = Drive(&smoother, Velocity2D{9.0, 0.0}, DynamicState{}, 500);
   EXPECT_NEAR(trace.velocity.back(), profile.limits.max_vel_x, 1e-6);
-  EXPECT_LE(*std::max_element(trace.velocity.begin(), trace.velocity.end()),
+  EXPECT_LE(
+    *std::max_element(trace.velocity.begin(), trace.velocity.end()),
     profile.limits.max_vel_x + 1e-9);
 }
 
@@ -261,7 +262,8 @@ TEST(MotionSmootherTest, ResetClearsAccelerationHistory) {
   // After a reset the first step must be jerk-limited from zero, not from the
   // stale acceleration.
   const Trace trace = Drive(&smoother, Velocity2D{1.2, 0.0}, DynamicState{}, 1);
-  EXPECT_LE(std::abs(trace.jerk.front()),
+  EXPECT_LE(
+    std::abs(trace.jerk.front()),
     LightScoutProfile().limits.EffectiveJerkX(0.0, 0.0) + 1e-9);
 }
 

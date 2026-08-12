@@ -382,6 +382,169 @@ parameters that assumption is false, and it fails quietly.
 
 ---
 
+## 7e. One scoping mistake, three unrelated-looking failures
+
+The most instructive bug in the project, because the symptoms were nowhere near
+the cause.
+
+SLAM and nav2 are started a few seconds after the rest of the robot, so the
+Gazebo diff-drive plugin has time to begin publishing `odom -> base_footprint`.
+That delay was implemented by putting a `TimerAction` inside the robot's
+namespaced group:
+
+```python
+namespaced_nodes.append(TimerAction(period=delay, actions=[slam, navigation]))
+...
+GroupAction([PushRosNamespace(robot_name)] + namespaced_nodes)   # the bug
+```
+
+`PushRosNamespace` is **scoped**. `GroupAction` applies it while visiting its
+children and pops it as soon as that visit finishes. `TimerAction` does not run
+its children during the visit -- it defers them -- so by the time they start,
+the namespace is gone. Everything in the timer launched into the **root**
+namespace, silently.
+
+Three failures followed, none of which points at namespacing:
+
+| Symptom | Actual cause |
+|---|---|
+| `Could not find a connection between 'map' and 'amr1/base_footprint'. Tf has two or more unconnected trees.` | `slam_toolbox` started as `/slam_toolbox`, so its `root_key: amr1` parameters never matched. On defaults it published `map -> odom` while the robot's frames were `amr1/odom` and `amr1/base_footprint`. |
+| `No critics defined for FollowPath`, lifecycle bringup aborts | nav2's servers started unnamespaced, so their parameters did not match either. `controller_server` came up with an empty critics list. |
+| Local costmap silently loads `static/obstacle/inflation` | Same cause. The configured `obstacle/fleet/inflation` never applied, so the conflict-aware fleet layer was simply absent -- and nothing said so. |
+
+The fix is that every deferred block carries its own push, with the timer on the
+outside:
+
+```python
+TimerAction(period=delay, actions=[namespaced(robot_name, [slam, navigation])])
+```
+
+Wrapping now happens in exactly one helper, `namespaced()`, and
+`test_launch_namespacing.py` walks the launch description that
+`robot.launch.py` actually produces -- modelling the timer's cleared scope --
+asserting no per-robot node is reachable without a push, for one robot and for
+all ten. Two of its checks are pure source-shape assertions that run without ROS
+installed, so the guarantee holds even in a bare checkout.
+
+**The transferable lesson:** when a parameter file is keyed by node name, a node
+in the wrong namespace does not fail -- it quietly runs on defaults. That makes
+namespacing a *correctness* property worth asserting structurally, not a
+cosmetic one. The generic version: any mechanism that silently substitutes a
+default when a lookup misses will convert a wiring error into a behavioural one,
+and behavioural errors are debugged far from where they were introduced.
+
+---
+
+## 7f. A costmap the robot was never inside
+
+**Symptom.** With one robot spawned, `planner_server` logs, on repeat:
+
+```
+[planner_server-13] [WARN] [nav2_costmap_2d]: Robot is out of bounds of the costmap!
+```
+
+**Cause.** nav2's global costmap defaults to **5 x 5 m anchored at the
+origin**, and a non-rolling costmap only resizes when its *static layer*
+receives a map. Every robot in this fleet spawns near `x = -18.5`. So from
+`planner_server` activating until the first fused map lands on `/map`, the
+robot is outside its own global costmap and the planner refuses to plan.
+
+The window is short when map fusion is running. It is unbounded when it is
+not -- and it is not whenever someone launches a single robot with
+`fleet_services:=false`, which is exactly what the runbook tells them to do to
+isolate a problem. The debugging advice produced a failure of its own.
+
+**Why it was invisible.** Same reason as 7e: nothing errors. A costmap of the
+wrong size is a *valid* costmap. The only evidence is a warning that names the
+symptom (`out of bounds`) rather than the cause (`5 x 5 at the origin`), and no
+log line anywhere states the costmap's actual geometry.
+
+**Fix.** The bounds of the shared grid became a first-class part of the roster
+(`map_extents:` in `fleet.yaml`). Two consumers read that one block -- map
+fusion allocates the merged grid over it, and the global costmap is sized and
+placed from it -- so the fused map and the costmap it fills are the same
+rectangle *by construction*.
+
+**Why the geometry is a textual placeholder and not a `RewrittenYaml` key.**
+The same trap as the frame names in 7d. `RewrittenYaml` matches on key name and
+replaces every occurrence, and `width`, `height` and `resolution` all appear
+again in the rolling *local* costmap. One `width` rewrite would have given
+every robot a 48-metre local costmap updated at 10 Hz -- a worse bug than the
+one being fixed, and one that would have looked like a performance problem
+rather than a configuration one. `test_the_local_costmap_keeps_its_own_geometry`
+holds that line.
+
+**What stops it recurring.** Thirteen tests, of which two carry the weight:
+`test_the_global_costmap_contains_every_spawn_pose` expands the real
+`nav2_params.yaml` the way `navigation.launch.py` does and asserts every
+robot's spawn pose lies inside the resulting grid with clearance for its own
+footprint -- for both rosters, ten robots included. And `load_map_extents`
+rejects a roster whose spawn point does not fit, so moving a robot outside the
+map is a startup error rather than a warning nobody reads.
+
+**The transferable lesson**, and it is 7e's wearing different clothes: a
+library default that is *structurally valid but situationally wrong* is more
+dangerous than a missing value. A missing value raises. A 5 x 5 costmap at the
+origin runs perfectly and simply never contains the robot.
+
+---
+
+## 7g. A node that ignores its own namespace
+
+7f sized the global costmap correctly and the warning kept coming. Three
+commands explained why:
+
+```
+$ ros2 topic info /map -v
+Publisher count: 2
+  Node name: map_fusion     Node namespace: /
+  Node name: slam_toolbox   Node namespace: /amr1     <-- publishing on /map
+
+$ ros2 topic info /amr1/map -v
+Publisher count: 0
+Subscription count: 1        (selective_mapping, waiting for a map nobody sends)
+
+[map_fusion]: merged map: 0.0% explored (0 cells observed by 2 robots)
+```
+
+**Cause.** `PushRosNamespace` only moves topics a node created with a
+*relative* name. slam_toolbox constructs its map publishers with literal
+absolute names -- `/map` and `/map_metadata` -- so no amount of correct
+namespacing moves them. The launch file did carry a remap rule, but it was
+written `('map', 'map')`: a relative source, matching a topic the node never
+created. **An unmatched remap rule is not an error.** It silently does nothing.
+
+Two consequences, and they were one bug:
+
+1. **The pipeline was severed.** `selective_mapping` waits on `<robot>/map`,
+   which now had no publisher, so it never emitted a contribution and
+   `map_fusion` merged nothing -- printed once every ten seconds by a node that
+   was working perfectly.
+2. **The costmap was resized to the wrong map.** Both slam_toolbox's private
+   grid and the fused grid arrived on `/map`. nav2's static layer takes the
+   last one it receives, and slam_toolbox's is a small grid in the `amr1/map`
+   frame near the origin. So the global costmap, correctly sized by 7f, was
+   immediately resized to a few metres around the origin.
+
+**Fix.** Name the topic in the remap exactly as the node created it:
+`('/map', 'map')` -- absolute source, relative target.
+
+**What stops it recurring.** Three tests, all running without ROS:
+`test_absolutely_named_topics_are_remapped_with_a_leading_slash` keeps a table
+of packages known to hardcode absolute names; `test_no_remap_rule_is_a_relative_no_op`
+rejects any `('x', 'x')` rule outright, because that pair is always either dead
+code or this bug and it *reads* as deliberate; and
+`test_only_map_fusion_may_publish_the_shared_map` holds the fusion invariant.
+
+**The transferable lesson.** ROS 2's remapping and namespacing are *matching*
+mechanisms, and a match that fails is indistinguishable from one that was never
+needed. 7e was a namespace push that did not reach its nodes, 7f a default that
+was valid but wrong, this a rule that matched nothing -- three mechanisms, one
+shared property: **the failure mode is silence, so the only durable defence is
+a test that asserts the wiring rather than a reviewer who reads it.**
+
+---
+
 ## 8. Log-odds map fusion, not maximum occupancy
 
 The simple fusion is to take the maximum occupancy across robots. In this
@@ -408,11 +571,136 @@ accumulator exists to avoid.
 
 ---
 
+## 8b. The start pose, applied twice
+
+The real cause behind 7f and 7g's shared symptom. Both of those were genuine
+defects; neither was *this*, which is why the warning survived them.
+
+**Two symptoms that look unrelated:**
+
+```
+[planner_server]: Robot is out of bounds of the costmap!        (every cycle)
+[map_fusion]: merged map: 0.0% explored (0 cells observed by 2 robots)
+```
+
+Meanwhile every component was healthy: `/amr1/map` publishing at 1 Hz,
+`selective_mapping` writing 258 frontier cells, `/map` with exactly one
+publisher, the costmap correctly sized to the warehouse.
+
+**Cause.** Four components each contribute one link to
+`map -> <robot>/base_footprint`:
+
+| Link | Published by |
+|---|---|
+| `map -> <robot>/map` | `map_fusion`, from the roster's initial pose |
+| `<robot>/map -> <robot>/odom` | `slam_toolbox`, the SLAM correction |
+| `<robot>/odom -> <robot>/base_footprint` | the Gazebo diff-drive plugin |
+
+The chain is correct only if the robot's start pose appears in **exactly one**
+of them. It belongs in the first -- anchoring a private SLAM frame into the
+shared one is what lets ten robots share a map.
+
+The URDF had `<odometry_source>1</odometry_source>`, which is `WORLD`:
+`gazebo_ros_diff_drive` publishes Gazebo's ground-truth pose as odometry. So
+`<robot>/odom -> <robot>/base_footprint` *already* contained (-18.5, 2.2), and
+the anchor added it again. The robot reported **(-37.0, 4.4)** in `map`.
+
+That one number explains both symptoms:
+
+* -37.0 is outside the global costmap's `x[-24, 24]`, so
+  `LayeredCostmap::updateMap` calls `isOutofBounds` and warns every cycle;
+* every map cell carries the same offset, so all of them fall outside the
+  merged grid and `Integrate` discards the lot -- `0 cells observed`, while the
+  robot's own SLAM map looked perfect.
+
+**Fix.** `<odometry_source>0</odometry_source>` -- encoder odometry, starting
+at zero.
+
+There is a second reason to prefer it that matters more than the bug.
+Ground-truth odometry means SLAM never has to correct a drift or close a loop,
+so a cooperative-SLAM exercise built on it measures nothing. Encoder odometry
+drifts. That is the entire reason SLAM exists.
+
+**Why it took three passes.** The warning names a symptom -- "out of bounds" --
+and never the quantity that is wrong. Three causes produced the same sentence.
+The lesson is not "look harder"; it is that a symptom shared by several causes
+should be the last thing consulted, not the first. The decisive evidence, once
+frames were suspected, was arithmetic: the anchor is (-18.5, 2.2), the costmap
+starts at -24, and -18.5 - 18.5 = -37.
+
+**What stops it recurring.**
+
+* `test_frame_chain.py` asserts the invariant directly: odometry must be
+  ENCODER, and `map_fusion` must be the only component that turns the roster's
+  initial pose into a transform. Both checks run without ROS.
+* `MapFusion::IntegrationReport` ends the ambiguity that hid this. `Integrate`
+  returned 0 for three unrelated reasons and the caller could not tell which,
+  so the most specific thing the system could say was "0.0% explored". It now
+  reports how many cells were unknown, how many fell outside the grid, and the
+  **bounding box of the evidence in the shared frame** -- which prints the
+  doubled offset directly:
+
+```
+amr1: all 258 observed cells fell OUTSIDE the merged grid. Their extent in
+'map' is x[-37.2, -36.8] y[4.2, 4.6]; the grid covers x[-24.0, 24.0]
+y[-17.0, 17.0]. This is a frame error, not a small map -- check that the
+robot's odometry starts at zero, because if it already carries the spawn pose
+then the roster offset (-18.5, 2.2) is being applied twice.
+```
+
+**The transferable lesson.** A count is a measurement, not a diagnosis. Any
+function that can return zero for several unrelated reasons will eventually be
+asked which one happened, and the cheapest moment to answer is before it is
+asked. This three-field struct would have turned a three-round debugging
+session into one glance -- and unlike a guard test, it also helps with the
+failures nobody thought to predict.
+
+---
+
+## 8c. `self.clients = {}`
+
+The demo dispatcher crashed before sending a single goal:
+
+```
+File "send_goals.py", line 75, in __init__
+    self.clients = {}
+AttributeError: can't set attribute 'clients'
+```
+
+`rclpy.node.Node` exposes `clients` as a **read-only property**, along with
+`publishers`, `subscriptions`, `services`, `timers`, `guards`, `waitables`,
+`context` and `handle`. Every one is the natural name for a dictionary of
+things a node holds, which is what makes the collision easy: the line reads
+correctly, and Python only resolves the property when the constructor runs.
+
+This is 7b in a different language. There, a test helper named `Run()` collided
+with a private member of `testing::Test` and broke the build. The C++ one at
+least failed at compile time. This failed at *construction* time, in a script
+whose unit tests never instantiate the node, so nothing caught it until a
+scripted acceptance run reported "the robots don't move".
+
+**Fix.** `self.goal_clients`.
+
+**What stops it recurring.** `test_node_attribute_shadowing.py` walks the AST
+of every Python file in the workspace, finds every class deriving from `Node`,
+and rejects any `self.<name> = ...` where `<name>` is one of the base class's
+read-only properties. It is source-level on purpose -- an import-level check
+would not have caught this, because the collision needs a constructor to run.
+A second test re-derives the reserved list from the real `rclpy.node.Node`
+wherever ROS is installed, so the hardcoded copy cannot drift.
+
+**The transferable lesson**, now the third instance in this project: inheriting
+from a framework class means inheriting its whole namespace, and frameworks
+reserve exactly the names that are most natural to reuse. The general defence
+is not vigilance; it is a check that enumerates the base class and compares.
+
+---
+
 ## 9. What I would do next
 
 Honest gaps, roughly in the order I would close them.
 
-1. **Integration tests under `launch_testing`.** The 217 automated tests cover the
+1. **Integration tests under `launch_testing`.** The 243 automated tests cover the
    algorithms thoroughly and the node wiring not at all. A `launch_testing`
    suite that brings up two robots headless and asserts on `/cmd_vel` and
    `/fleet/traffic_directives` would cover the seam between them.

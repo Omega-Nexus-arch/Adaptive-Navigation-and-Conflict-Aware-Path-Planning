@@ -23,7 +23,8 @@ sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
 
 from amr_bringup.fleet_loader import (  # noqa: E402
-    FleetConfigError, load_fleet, load_model_library, nav2_substitutions,
+    DEFAULT_MAP_EXTENTS, FleetConfigError, load_fleet, load_map_extents,
+    load_model_library, map_substitutions, nav2_substitutions,
     resolve_library_path, resolve_package_uri)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -360,7 +361,12 @@ def _expand_nav2_params(robot, fleet):
 
     subs = nav2_substitutions(robot, fleet['global_frame'], '/opt/elev.yaml')
     with open(config('nav2_params.yaml'), 'r', encoding='utf-8') as handle:
-        text = handle.read().replace('<ns>', robot['name'])
+        text = handle.read()
+
+    textual = {'<ns>': robot['name']}
+    textual.update(map_substitutions(fleet['map_extents']))
+    for placeholder, value in textual.items():
+        text = text.replace(placeholder, value)
     return rewrite(yaml.safe_load(text), subs)
 
 
@@ -454,3 +460,180 @@ def test_every_robot_gets_its_own_elevation_and_slope_limit():
         assert subs['elevation_map'] == '/opt/elevation.yaml'
         assert float(subs['max_traversable_angle_degrees']) > 0.0
         assert subs['robot_name'] == robot['name']
+
+
+# ---------------------------------------------------------------------------
+# Shared map extents
+#
+# nav2's global costmap defaults to 5 x 5 m at the origin and only grows once
+# its static layer receives a map. Robots here spawn near x = -18.5, so with
+# the defaults the planner sits outside its own costmap and logs
+#
+#     [nav2_costmap_2d]: Robot is out of bounds of the costmap!
+#
+# every update cycle -- indefinitely if map fusion is not running, which is the
+# case whenever someone launches a single robot with `fleet_services:=false`.
+# Nothing errors; the robot simply never plans.
+# ---------------------------------------------------------------------------
+
+
+def test_the_shipped_rosters_declare_extents_that_contain_every_spawn():
+    for roster in ('fleet.yaml', 'fleet_ten_robots.yaml'):
+        fleet = load_fleet(config(roster))
+        extents = fleet['map_extents']
+        for robot in fleet['robots']:
+            radius = float(robot['model_properties']['footprint_radius'])
+            assert extents['x_min'] + radius <= robot['x'] <= extents['x_max'] - radius
+            assert extents['y_min'] + radius <= robot['y'] <= extents['y_max'] - radius
+
+
+def test_the_global_costmap_contains_every_spawn_pose():
+    """The property that matters, asserted on the expanded YAML.
+
+    Reaching into the parameters nav2 would really receive -- rather than into
+    the loader -- is deliberate: the bug lived in the gap between the extents
+    being known and them reaching the costmap.
+    """
+    for roster in ('fleet.yaml', 'fleet_ten_robots.yaml'):
+        fleet = load_fleet(config(roster))
+        for robot in fleet['robots']:
+            params = _expand_nav2_params(robot, fleet)
+            grid = params['global_costmap']['global_costmap']['ros__parameters']
+
+            origin_x = float(grid['origin_x'])
+            origin_y = float(grid['origin_y'])
+            radius = float(grid['robot_radius'])
+
+            assert origin_x + radius <= robot['x'] <= origin_x + grid['width'] - radius, (
+                f"{robot['name']} spawns at x={robot['x']} but its global costmap "
+                f"covers x[{origin_x}, {origin_x + grid['width']}]; nav2 would log "
+                f"'Robot is out of bounds of the costmap!' and never plan")
+            assert origin_y + radius <= robot['y'] <= origin_y + grid['height'] - radius
+
+
+def test_the_global_costmap_is_not_left_at_the_nav2_default():
+    """5 x 5 m at (0, 0) is the shape of the bug. Refuse it explicitly."""
+    fleet = load_fleet(config('fleet.yaml'))
+    grid = (_expand_nav2_params(fleet['robots'][0], fleet)
+            ['global_costmap']['global_costmap']['ros__parameters'])
+    assert grid['rolling_window'] is False
+    assert grid['width'] > 5 and grid['height'] > 5
+    assert float(grid['origin_x']) < 0.0 and float(grid['origin_y']) < 0.0
+
+
+def test_the_local_costmap_keeps_its_own_geometry():
+    """Why the extents are textual placeholders and not key rewrites.
+
+    ``RewrittenYaml`` matches on key name, so a single `width` rewrite would
+    give every robot a 48-metre rolling local costmap updated at 10 Hz.
+    """
+    fleet = load_fleet(config('fleet.yaml'))
+    for robot in fleet['robots']:
+        params = _expand_nav2_params(robot, fleet)
+        local = params['local_costmap']['local_costmap']['ros__parameters']
+        assert local['width'] == 8 and local['height'] == 8
+        assert local['rolling_window'] is True
+
+    subs = nav2_substitutions(fleet['robots'][0], 'map', '/opt/elev.yaml')
+    assert 'width' not in subs and 'origin_x' not in subs
+
+
+def test_no_placeholder_of_any_kind_survives_expansion():
+    fleet = load_fleet(config('fleet.yaml'))
+    for robot in fleet['robots']:
+        dumped = yaml.dump(_expand_nav2_params(robot, fleet))
+        for placeholder in ('<ns>', '<map_width>', '<map_height>',
+                            '<map_origin_x>', '<map_origin_y>', '<map_resolution>'):
+            assert placeholder not in dumped, \
+                f"unsubstituted {placeholder} left in {robot['name']}'s parameters"
+
+
+def test_map_fusion_and_the_global_costmap_describe_the_same_rectangle():
+    """Two consumers, one block. This is what stops them drifting apart."""
+    fleet = load_fleet(config('fleet.yaml'))
+    extents = fleet['map_extents']
+    grid = (_expand_nav2_params(fleet['robots'][0], fleet)
+            ['global_costmap']['global_costmap']['ros__parameters'])
+
+    assert float(grid['origin_x']) == pytest.approx(extents['x_min'])
+    assert float(grid['origin_y']) == pytest.approx(extents['y_min'])
+    assert float(grid['resolution']) == pytest.approx(extents['resolution'])
+    assert grid['width'] >= extents['x_max'] - extents['x_min']
+    assert grid['height'] >= extents['y_max'] - extents['y_min']
+
+
+def test_a_spawn_outside_the_extents_is_rejected_at_load(tmp_path):
+    path = write_roster(tmp_path, [
+        {'name': 'amr1', 'model': 'heavy_mapper', 'x': -18.5, 'y': 2.2,
+         'yield_priority': 100},
+        {'name': 'amr2', 'model': 'light_scout', 'x': -400.0, 'y': 0.0,
+         'yield_priority': 50},
+    ])
+    with pytest.raises(FleetConfigError) as error:
+        load_fleet(path)
+    assert 'amr2' in str(error.value)
+    assert 'never plan' in str(error.value)
+
+
+def test_a_spawn_that_only_just_overhangs_the_edge_is_rejected():
+    """The centre is inside; the body is not. nav2 rejects every plan from
+    such a pose, and says nothing about why."""
+    extents = {'x_min': -10.0, 'x_max': 10.0, 'y_min': -10.0, 'y_max': 10.0,
+               'resolution': 0.05}
+    robot = {'name': 'edge', 'x': 9.8, 'y': 0.0,
+             'model_properties': {'footprint_radius': 0.55}}
+    with pytest.raises(FleetConfigError):
+        load_map_extents({'map_extents': extents}, [robot])
+
+    robot['x'] = 9.0
+    assert load_map_extents({'map_extents': extents}, [robot])['x_max'] == 10.0
+
+
+def test_inverted_or_degenerate_extents_are_rejected():
+    for bad in ({'x_min': 5.0, 'x_max': -5.0},
+                {'y_min': 1.0, 'y_max': 1.0},
+                {'resolution': 0.0},
+                {'resolution': -0.05}):
+        with pytest.raises(FleetConfigError):
+            load_map_extents({'map_extents': dict(DEFAULT_MAP_EXTENTS, **bad)}, [])
+
+
+def test_a_misspelled_extent_key_is_rejected_not_ignored():
+    """Silently defaulting is how the costmap ends up the wrong size."""
+    with pytest.raises(FleetConfigError) as error:
+        load_map_extents({'map_extents': {'xmin': -24.0}}, [])
+    assert 'xmin' in str(error.value)
+
+
+def test_a_roster_without_extents_still_loads(tmp_path):
+    """An older roster must not fail to launch; it gets the world's bounds."""
+    path = write_roster(tmp_path, [
+        {'name': 'amr1', 'model': 'heavy_mapper', 'x': -18.5, 'y': 2.2,
+         'yield_priority': 100},
+    ])
+    assert load_fleet(path)['map_extents'] == DEFAULT_MAP_EXTENTS
+
+
+def test_extents_are_wide_enough_for_the_generated_world():
+    """A grid smaller than the warehouse makes the far aisles unreachable."""
+    elevation = os.path.normpath(os.path.join(
+        HERE, os.pardir, os.pardir, 'amr_gazebo', 'maps',
+        'warehouse_elevation.yaml'))
+    with open(elevation, 'r', encoding='utf-8') as handle:
+        world = yaml.safe_load(handle)
+    cell = float(world['resolution'])
+    extents = load_fleet(config('fleet.yaml'))['map_extents']
+
+    assert extents['x_min'] <= float(world['origin'][0])
+    assert extents['y_min'] <= float(world['origin'][1])
+    assert extents['x_max'] >= float(world['origin'][0]) + world['width'] * cell
+    assert extents['y_max'] >= float(world['origin'][1]) + world['height'] * cell
+
+
+def test_map_substitutions_round_the_grid_up_never_down():
+    subs = map_substitutions(
+        {'x_min': -1.2, 'x_max': 1.9, 'y_min': -0.4, 'y_max': 0.1,
+         'resolution': 0.05})
+    assert int(subs['<map_width>']) >= 1.9 - (-1.2)
+    assert int(subs['<map_height>']) >= 0.1 - (-0.4)
+    assert float(subs['<map_origin_x>']) == -1.2

@@ -151,6 +151,37 @@ private:
     RCLCPP_DEBUG(
       get_logger(), "%s contributed %zu cells (%zu cumulative)", robot_name.c_str(), updated,
       integrated_cells_[robot_name]);
+
+    // A contribution that carries evidence but changes nothing is a bug, not a
+    // quiet period, and it used to be indistinguishable from an idle fleet.
+    // Say which of the three possible reasons it was, with the numbers needed
+    // to act on it.
+    const MapFusion::IntegrationReport & report = fusion_->LastReport();
+    if (updated != 0) {
+      return;
+    }
+    if (report.geometry_mismatch) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 5000,
+        "%s: contribution declares %ux%u cells but carries %zu; discarded",
+        robot_name.c_str(), contribution.info.width, contribution.info.height,
+        contribution.data.size());
+    } else if (report.outside_extent != 0) {
+      RCLCPP_ERROR_THROTTLE(
+        get_logger(), *get_clock(), 5000,
+        "%s: all %zu observed cells fell OUTSIDE the merged grid. Their extent in "
+        "'%s' is x[%.1f, %.1f] y[%.1f, %.1f]; the grid covers x[%.1f, %.1f] "
+        "y[%.1f, %.1f]. This is a frame error, not a small map -- check that the "
+        "robot's odometry starts at zero, because if it already carries the spawn "
+        "pose then the roster offset (%.1f, %.1f) is being applied twice.",
+        robot_name.c_str(), report.outside_extent, fleet_.GlobalFrame().c_str(),
+        report.min_x, report.max_x, report.min_y, report.max_y,
+        fusion_->Info().origin_x,
+        fusion_->Info().origin_x + fusion_->Info().width * fusion_->Info().resolution,
+        fusion_->Info().origin_y,
+        fusion_->Info().origin_y + fusion_->Info().height * fusion_->Info().resolution,
+        contribution.offset_x, contribution.offset_y);
+    }
   }
 
   void PublishMap()

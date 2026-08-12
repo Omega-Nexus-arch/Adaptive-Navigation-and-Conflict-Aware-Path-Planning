@@ -22,21 +22,23 @@ launch file costs throughput rather than collision avoidance.
 import os
 
 from ament_index_python.packages import get_package_share_directory
+from amr_bringup.fleet_loader import load_fleet
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
-def generate_launch_description():
-    bringup_share = get_package_share_directory('amr_bringup')
-    fleet_config = LaunchConfiguration('fleet_config')
+def _fleet_nodes(context, *args, **kwargs):
+    fleet_config = LaunchConfiguration('fleet_config').perform(context)
 
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            'fleet_config',
-            default_value=os.path.join(bringup_share, 'config', 'fleet.yaml')),
+    # The merged grid's bounds come from the roster, not from numbers typed
+    # here. nav2's global costmap is sized from the same block
+    # (navigation.launch.py), so the fused map and the costmap it fills are the
+    # same rectangle by construction rather than by two people remembering.
+    extents = load_fleet(fleet_config)['map_extents']
 
+    return [
         Node(
             package='amr_fleet_control',
             executable='traffic_control_node',
@@ -60,13 +62,22 @@ def generate_launch_description():
             parameters=[{
                 'fleet_config': fleet_config,
                 'use_sim_time': True,
-                'resolution': 0.05,
-                # Matches the generated world's extent with a small margin.
-                'x_min': -24.0,
-                'x_max': 24.0,
-                'y_min': -17.0,
-                'y_max': 17.0,
+                'resolution': float(extents['resolution']),
+                'x_min': float(extents['x_min']),
+                'x_max': float(extents['x_max']),
+                'y_min': float(extents['y_min']),
+                'y_max': float(extents['y_max']),
                 'publish_rate': 1.0,
             }],
         ),
+    ]
+
+
+def generate_launch_description():
+    bringup_share = get_package_share_directory('amr_bringup')
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'fleet_config',
+            default_value=os.path.join(bringup_share, 'config', 'fleet.yaml')),
+        OpaqueFunction(function=_fleet_nodes),
     ])

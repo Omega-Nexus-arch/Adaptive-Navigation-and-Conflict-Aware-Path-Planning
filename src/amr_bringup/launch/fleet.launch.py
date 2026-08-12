@@ -63,11 +63,20 @@ def _fleet(context, *args, **kwargs):
                 PythonLaunchDescriptionSource(
                     os.path.join(bringup_share, 'launch', 'simulation.launch.py'))))
 
+    # Start the global singleton BEFORE robot stacks. map_fusion publishes the
+    # static map -> <robot>/map anchors required by slam_toolbox and nav2; if it
+    # comes up after the robots, global costmaps wait on a frame that cannot
+    # exist yet and lifecycle startup becomes timing-dependent.
+    actions.append(
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(bringup_share, 'launch', 'fleet_control.launch.py')),
+            launch_arguments={'fleet_config': fleet_config}.items(),
+        ))
+
     # Robots are staggered rather than started together. Spawning several
     # models into Gazebo simultaneously reliably wedges the spawn service, and
-    # bringing up N nav2 stacks at once on one machine trips the lifecycle
-    # bond timeouts. The delay costs a few seconds and removes a whole class
-    # of "it works on my machine" startup failures.
+    # bringing up N nav2 stacks at once on one machine trips lifecycle bonds.
     for index, robot in enumerate(fleet['robots']):
         actions.append(
             TimerAction(
@@ -81,24 +90,12 @@ def _fleet(context, *args, **kwargs):
                             'fleet_config': fleet_config,
                             'slam': use_slam,
                             'navigation': use_navigation,
+                            # Global services are already above; never duplicate them.
+                            'fleet_services': 'false',
                         }.items(),
                     ),
                 ],
             ))
-
-    # Fleet-level nodes come up after the robots so the map-fusion node's
-    # per-robot subscriptions find publishers immediately.
-    actions.append(
-        TimerAction(
-            period=spawn_delay * len(fleet['robots']) + 2.0,
-            actions=[
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(
-                        os.path.join(bringup_share, 'launch', 'fleet_control.launch.py')),
-                    launch_arguments={'fleet_config': fleet_config}.items(),
-                ),
-            ],
-        ))
 
     if use_rviz in ('true', '1', 'yes'):
         actions.append(

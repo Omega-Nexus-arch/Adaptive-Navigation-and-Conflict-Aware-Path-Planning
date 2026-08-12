@@ -42,6 +42,26 @@ def _slam_nodes(context, *args, **kwargs):
             name='slam_toolbox',
             output='screen',
             parameters=[slam_params],
+            # Keep SLAM's map topics private to this robot.
+            #
+            # THE SOURCE NAMES MUST CARRY A LEADING SLASH. slam_toolbox
+            # constructs these publishers with *absolute* names -- literally
+            # "/map" and "/map_metadata" -- so pushing a namespace does not
+            # move them, and a remap rule written as the relative `map` matches
+            # nothing at all. The rule has to name the topic exactly as the
+            # node created it.
+            #
+            # The targets are relative, so under the pushed /<robot> namespace
+            # they resolve to /<robot>/map and /<robot>/map_metadata.
+            #
+            # Left absolute, slam_toolbox publishes its own small, robot-private
+            # grid onto the fleet's shared /map alongside map_fusion, and nav2's
+            # static layer resizes the global costmap to whichever arrived last.
+            # See DESIGN_NOTES 7g.
+            remappings=[
+                ('/map', 'map'),
+                ('/map_metadata', 'map_metadata'),
+            ],
         ),
 
         # The selective-iteration policy. Sits between SLAM and fusion: it

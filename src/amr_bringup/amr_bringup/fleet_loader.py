@@ -14,6 +14,7 @@ instead of producing a half-started fleet whose nodes then throw one by one.
 Style: PEP 8, checked by ament_flake8.
 """
 
+import math
 import os
 
 import yaml
@@ -21,6 +22,22 @@ import yaml
 
 class FleetConfigError(RuntimeError):
     """Raised for a malformed roster or model library."""
+
+
+#: Bounds of the shared occupancy grid, used when a roster omits
+#: ``map_extents``. Chosen to contain the generated warehouse
+#: (x[-22, 22] y[-15, 15]) with two metres of margin.
+#:
+#: There is a default at all only so an older roster still launches. Every
+#: shipped roster states its extents explicitly, because the value is a
+#: property of the *world*, not of the software.
+DEFAULT_MAP_EXTENTS = {
+    'x_min': -24.0,
+    'x_max': 24.0,
+    'y_min': -17.0,
+    'y_max': 17.0,
+    'resolution': 0.05,
+}
 
 
 def _unwrap(document):
@@ -207,8 +224,90 @@ def load_fleet(path):
         'robots': resolved,
         'policy': fleet.get('policy', {}),
         'global_frame': fleet.get('global_frame', 'map'),
+        'map_extents': load_map_extents(fleet, resolved, path),
         'models': models,
         'model_library_path': library_path,
+    }
+
+
+def load_map_extents(fleet, robots, path='<roster>'):
+    """Read and validate the bounds of the shared occupancy grid.
+
+    The bounds are checked against the roster rather than merely parsed,
+    because the failure they guard against is silent. nav2's global costmap
+    defaults to 5 x 5 m at the origin and only grows when a static map arrives
+    on its ``map_topic``. A robot that starts outside its own global costmap
+    does not error; the planner simply logs
+
+        [nav2_costmap_2d]: Robot is out of bounds of the costmap!
+
+    once per update cycle and refuses to plan.
+
+    The clearance requirement is the robot's own footprint radius: a robot
+    whose centre is inside the grid but whose body overhangs the edge cannot
+    have its footprint checked for collision, so nav2 would reject every plan
+    from that pose for a reason no log line explains.
+    """
+    raw = fleet.get('map_extents') or {}
+    if not isinstance(raw, dict):
+        raise FleetConfigError(f"{path}: `map_extents:` must be a mapping")
+
+    extents = dict(DEFAULT_MAP_EXTENTS)
+    for key, value in raw.items():
+        if key not in DEFAULT_MAP_EXTENTS:
+            raise FleetConfigError(
+                f"{path}: unknown map_extents key '{key}'. Expected one of: "
+                f"{', '.join(sorted(DEFAULT_MAP_EXTENTS))}")
+        extents[key] = float(value)
+
+    for low, high in (('x_min', 'x_max'), ('y_min', 'y_max')):
+        if extents[high] <= extents[low]:
+            raise FleetConfigError(
+                f"{path}: map_extents {high} ({extents[high]}) must exceed "
+                f"{low} ({extents[low]})")
+    if extents['resolution'] <= 0.0:
+        raise FleetConfigError(
+            f"{path}: map_extents resolution must be positive, got "
+            f"{extents['resolution']}")
+
+    for robot in robots:
+        # Fall back to a generous radius rather than zero: an unknown footprint
+        # should make the check stricter, not disable it.
+        radius = float(robot.get('model_properties', {}).get('footprint_radius', 0.6))
+        x, y = float(robot['x']), float(robot['y'])
+        inside = (
+            extents['x_min'] + radius <= x <= extents['x_max'] - radius and
+            extents['y_min'] + radius <= y <= extents['y_max'] - radius)
+        if not inside:
+            raise FleetConfigError(
+                f"{path}: robot '{robot['name']}' spawns at ({x}, {y}) with a "
+                f"{radius} m footprint, which does not fit inside map_extents "
+                f"x[{extents['x_min']}, {extents['x_max']}] "
+                f"y[{extents['y_min']}, {extents['y_max']}]. It would start "
+                f"outside its own global costmap and never plan.")
+
+    return extents
+
+
+def map_substitutions(extents):
+    """Build the ``<map_*>`` placeholders for the global costmap.
+
+    These go through the *textual* substitution pass in navigation.launch.py,
+    not through ``RewrittenYaml``, for the same reason the frame names do:
+    ``RewrittenYaml`` matches on key name and would replace the rolling local
+    costmap's ``width: 8`` with the width of the whole warehouse, giving every
+    robot a 48-metre local costmap updated at 10 Hz.
+
+    Width and height are rounded *up* to whole metres because nav2 declares
+    them as integers, and the origin stays at the true minimum, so the grid can
+    only ever be larger than the requested extents -- never smaller.
+    """
+    return {
+        '<map_width>': str(int(math.ceil(extents['x_max'] - extents['x_min']))),
+        '<map_height>': str(int(math.ceil(extents['y_max'] - extents['y_min']))),
+        '<map_origin_x>': repr(float(extents['x_min'])),
+        '<map_origin_y>': repr(float(extents['y_min'])),
+        '<map_resolution>': repr(float(extents['resolution'])),
     }
 
 

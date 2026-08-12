@@ -80,6 +80,31 @@ public:
     double contribution_timeout = 30.0;
   };
 
+  /// \brief Why the last Integrate() call produced the count it did.
+  ///
+  /// Integrate() can return zero for three unrelated reasons, and for a long
+  /// time the caller could not tell them apart -- which is how a frame bug
+  /// (every cell landing outside the merged extent, because the robot's start
+  /// pose was applied twice) presented as nothing more informative than
+  /// "0.0% explored". A count is a measurement; this is the diagnosis.
+  struct IntegrationReport
+  {
+    std::size_t updated = 0;
+    std::size_t skipped_unknown = 0;
+    /// Known cells whose global position fell outside the merged grid. A large
+    /// value here is almost always a frame or offset error, not a small map.
+    std::size_t outside_extent = 0;
+    /// The contribution's declared size disagreed with its payload.
+    bool geometry_mismatch = false;
+    /// Bounding box of the contribution's known cells, in the shared frame.
+    /// Compare it against the merged extent to see the offset directly.
+    bool has_bounds = false;
+    double min_x = 0.0;
+    double max_x = 0.0;
+    double min_y = 0.0;
+    double max_y = 0.0;
+  };
+
   explicit MapFusion(const Options & options);
 
   /// \brief Fold one robot's (already filtered) grid into the accumulator.
@@ -90,6 +115,9 @@ public:
   ///
   /// \return Number of global cells updated.
   std::size_t Integrate(const MapContribution & contribution);
+
+  /// \brief Diagnosis of the most recent Integrate() call.
+  const IntegrationReport & LastReport() const {return last_report_;}
 
   /// \brief Render the accumulator as an occupancy grid.
   void Render(std::vector<std::int8_t> * out_data) const;
@@ -109,6 +137,7 @@ private:
   GridInfo info_;
   std::vector<double> log_odds_;
   std::vector<std::uint8_t> observed_;
+  IntegrationReport last_report_;
 };
 
 }  // namespace amr_mapping

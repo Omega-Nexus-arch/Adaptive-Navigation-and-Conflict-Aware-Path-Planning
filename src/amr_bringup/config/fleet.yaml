@@ -42,6 +42,42 @@ fleet:
   # The frame all plans, trajectories and the merged map share.
   global_frame: "map"
 
+  # ---------------------------------------------------------------------------
+  # Extents of the single unified occupancy grid
+  # ---------------------------------------------------------------------------
+  # Bounds of the shared map, in metres in `global_frame`. The generated
+  # warehouse spans x[-22, 22] y[-15, 15]; the extra two metres of margin keep
+  # the walls themselves inside the grid rather than on its edge.
+  #
+  # THIS BLOCK HAS TWO CONSUMERS AND THEY MUST NOT DIVERGE:
+  #
+  #   * map_fusion allocates the merged grid over exactly these bounds
+  #     (fleet_control.launch.py);
+  #   * nav2's *global* costmap is sized and placed from them
+  #     (navigation.launch.py, via the <map_*> placeholders in
+  #     nav2_params.yaml).
+  #
+  # The second consumer is why this block exists. nav2's default global costmap
+  # is 5 x 5 m anchored at the origin, and it only grows when a static map
+  # arrives. A robot spawning at x = -18.5 therefore sits outside its own
+  # costmap for the whole interval between nav2 activating and the first fused
+  # map landing, and the planner logs
+  #
+  #     [nav2_costmap_2d]: Robot is out of bounds of the costmap!
+  #
+  # once per update until it does -- and forever if `/map` never arrives.
+  # Sizing the costmap from the world up front makes that window impossible
+  # instead of merely short.
+  #
+  # `check_model_consistency.py` asserts every robot in every roster spawns
+  # inside these bounds with clearance for its own footprint.
+  map_extents:
+    x_min: -24.0
+    x_max: 24.0
+    y_min: -17.0
+    y_max: 17.0
+    resolution: 0.05
+
   robots:
     # -- AMR-1: heavy mapper / lead ------------------------------------------
     # Higher priority: mission-critical, and the expensive one to stop and

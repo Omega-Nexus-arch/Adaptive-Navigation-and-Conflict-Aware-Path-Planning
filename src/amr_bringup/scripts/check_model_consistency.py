@@ -121,7 +121,28 @@ def main():
                     f"{label}: yield_priority {priority} is used twice; the yielding "
                     f"protocol would be non-deterministic")
             seen_priorities.add(priority)
-        notes.append(f'{label}: {len(robots)} robots, all models resolved')
+
+        # -- 6: spawn points against the shared map extents -------------------
+        extents = fleet.get('map_extents') or {}
+        x_min = float(extents.get('x_min', -24.0))
+        x_max = float(extents.get('x_max', 24.0))
+        y_min = float(extents.get('y_min', -17.0))
+        y_max = float(extents.get('y_max', 17.0))
+        for robot in robots:
+            radius = float(
+                models.get(robot['model'], {}).get('footprint_radius', 0.6))
+            x = float(robot.get('x', 0.0))
+            y = float(robot.get('y', 0.0))
+            if not (x_min + radius <= x <= x_max - radius and
+                    y_min + radius <= y <= y_max - radius):
+                problems.append(
+                    f"{label}: '{robot['name']}' spawns at ({x}, {y}) with a "
+                    f"{radius} m footprint, outside map_extents "
+                    f"x[{x_min}, {x_max}] y[{y_min}, {y_max}]. It would start "
+                    f"outside its own global costmap and never plan.")
+        notes.append(
+            f'{label}: {len(robots)} robots, all models resolved, all spawns '
+            f'inside x[{x_min}, {x_max}] y[{y_min}, {y_max}]')
 
     # -- 5: the generated world's ramps --------------------------------------
     try:
@@ -140,6 +161,41 @@ def main():
         notes.append(f'world: steepest ramp {steepest:.1f} deg, all models can climb it')
     except Exception as error:   # noqa: BLE001 - advisory check only
         notes.append(f'world ramp check skipped: {error}')
+
+    # -- 6b: the map extents must contain the world ---------------------------
+    # A shared grid smaller than the warehouse would clip the far aisles out of
+    # the global costmap, and the planner would report those goals unreachable
+    # rather than saying why.
+    try:
+        elevation_path = find('amr_gazebo', 'maps', 'warehouse_elevation.yaml')
+        with open(elevation_path, 'r', encoding='utf-8') as handle:
+            elevation = yaml.safe_load(handle)
+        cell = float(elevation['resolution'])
+        world = (
+            float(elevation['origin'][0]),
+            float(elevation['origin'][0]) + int(elevation['width']) * cell,
+            float(elevation['origin'][1]),
+            float(elevation['origin'][1]) + int(elevation['height']) * cell,
+        )
+        with open(find('amr_bringup', 'config', 'fleet.yaml'), 'r',
+                  encoding='utf-8') as handle:
+            extents = yaml.safe_load(handle)['fleet'].get('map_extents', {})
+        bounds = (
+            float(extents.get('x_min', -24.0)), float(extents.get('x_max', 24.0)),
+            float(extents.get('y_min', -17.0)), float(extents.get('y_max', 17.0)))
+        if (bounds[0] > world[0] or bounds[1] < world[1] or
+                bounds[2] > world[2] or bounds[3] < world[3]):
+            problems.append(
+                f'map_extents x[{bounds[0]}, {bounds[1]}] y[{bounds[2]}, {bounds[3]}] '
+                f'does not contain the generated world x[{world[0]}, {world[1]}] '
+                f'y[{world[2]}, {world[3]}]; the clipped aisles would be '
+                f'permanently unreachable')
+        else:
+            notes.append(
+                f'map_extents x[{bounds[0]}, {bounds[1]}] y[{bounds[2]}, {bounds[3]}] '
+                f'contains the world x[{world[0]}, {world[1]}] y[{world[2]}, {world[3]}]')
+    except Exception as error:   # noqa: BLE001 - advisory check only
+        notes.append(f'map extent check skipped: {error}')
 
     print('Model / fleet consistency check')
     print('=' * 60)

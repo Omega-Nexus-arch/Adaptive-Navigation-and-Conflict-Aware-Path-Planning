@@ -72,18 +72,23 @@ class GoalDispatcher(Node):
     def __init__(self, goals):
         super().__init__('send_goals')
         self.goals = goals
-        self.clients = {}
+        # NOT `self.clients`. `rclpy.node.Node` exposes a read-only `clients`
+        # property, so assigning to it raises `AttributeError: can't set
+        # attribute` at construction. Any attribute name on a Node subclass has
+        # to clear the base class first; `test_node_attribute_shadowing.py`
+        # enforces that for every node in the workspace.
+        self.goal_clients = {}
         self.results = {}
         self.pending = set()
 
         for robot, _x, _y, _yaw, _label in goals:
-            self.clients[robot] = ActionClient(
+            self.goal_clients[robot] = ActionClient(
                 self, NavigateToPose, f'/{robot}/navigate_to_pose')
 
     def dispatch(self, timeout=30.0):
         """Send every goal, then wait for all of them."""
         for robot, x, y, yaw, label in self.goals:
-            client = self.clients[robot]
+            client = self.goal_clients[robot]
             self.get_logger().info(f'waiting for {robot} navigate_to_pose...')
             if not client.wait_for_server(timeout_sec=timeout):
                 self.get_logger().error(

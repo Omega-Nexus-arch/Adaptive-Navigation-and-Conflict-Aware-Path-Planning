@@ -182,7 +182,7 @@ TEST(SelectiveMappingTest, RepeatedlyTraversedRegionsAreThrottled) {
   const SelectiveMappingStats stats = policy.Filter(source, 0.5, &filtered);
   EXPECT_GT(stats.suppression_ratio, 0.9)
     << "a saturated, unchanged, frontier-free map should be almost entirely "
-       "suppressed; got " << stats.suppression_ratio;
+    "suppressed; got " << stats.suppression_ratio;
   EXPECT_EQ(stats.policy_state, "throttled");
 }
 
@@ -247,7 +247,7 @@ TEST(SelectiveMappingTest, ASignificantChangeBypassesThrottling) {
   const SelectiveMappingStats stats = policy.Filter(source, 0.6, &filtered);
   EXPECT_EQ(filtered[index], kOccupied)
     << "a new obstacle must reach the merged map immediately, however well "
-       "travelled the aisle";
+    "travelled the aisle";
   EXPECT_GT(stats.cells_written, 0u);
 }
 
@@ -544,3 +544,61 @@ TEST(MapFusionTest, EndToEndSelectiveMappingIntoFusion) {
 }
 
 }  // namespace
+
+// ---------------------------------------------------------------------------
+// Diagnosing a zero.
+//
+// Integrate() returns 0 for three unrelated reasons, and the one that actually
+// happened -- a double-applied start pose putting every cell outside the merged
+// grid -- was indistinguishable from an idle fleet. The report exists so that
+// "0.0% explored" can never again be the most specific thing the system says.
+// ---------------------------------------------------------------------------
+
+TEST(MapFusionReportTest, TheReportSeparatesTheThreeWaysOfGettingZero) {
+  MapFusion fusion(FusionOptions());
+
+  // 1. Nothing to say: the contribution is entirely unknown.
+  MapContribution empty = MakeContribution("amr1", kFree, 0.0, 0.0);
+  std::fill(empty.data.begin(), empty.data.end(), static_cast<std::int8_t>(-1));
+  EXPECT_EQ(fusion.Integrate(empty), 0u);
+  EXPECT_EQ(fusion.LastReport().outside_extent, 0u);
+  EXPECT_FALSE(fusion.LastReport().geometry_mismatch);
+  EXPECT_GT(fusion.LastReport().skipped_unknown, 0u);
+
+  // 2. Malformed: declared size disagrees with the payload.
+  MapContribution malformed = MakeContribution("amr1", kFree, 0.0, 0.0);
+  malformed.data.pop_back();
+  EXPECT_EQ(fusion.Integrate(malformed), 0u);
+  EXPECT_TRUE(fusion.LastReport().geometry_mismatch);
+
+  // 3. The frame bug: real evidence, all of it in the wrong place.
+  EXPECT_EQ(fusion.Integrate(MakeContribution("amr1", kFree, 100.0, 100.0)), 0u);
+  EXPECT_GT(fusion.LastReport().outside_extent, 0u);
+  EXPECT_FALSE(fusion.LastReport().geometry_mismatch);
+}
+
+TEST(MapFusionReportTest, TheReportLocatesTheEvidenceSoAnOffsetErrorIsVisible) {
+  // The shape of the real bug: odometry already carried the spawn pose, so the
+  // roster offset was applied a second time and the contribution landed at
+  // twice the distance from the origin. The bounding box makes that readable
+  // at a glance instead of requiring a rebuild with printf.
+  MapFusion fusion(FusionOptions());
+  fusion.Integrate(MakeContribution("amr1", kFree, 37.0, 37.0));
+
+  const MapFusion::IntegrationReport & report = fusion.LastReport();
+  ASSERT_TRUE(report.has_bounds);
+  EXPECT_GT(
+    report.min_x,
+    fusion.Info().origin_x + fusion.Info().width * fusion.Info().resolution);
+  EXPECT_EQ(report.updated, 0u);
+}
+
+TEST(MapFusionReportTest, ASuccessfulIntegrationReportsNoProblem) {
+  MapFusion fusion(FusionOptions());
+  const std::size_t updated = fusion.Integrate(MakeContribution("amr1", kFree, 0.0, 0.0));
+  ASSERT_GT(updated, 0u);
+  EXPECT_EQ(fusion.LastReport().updated, updated);
+  EXPECT_EQ(fusion.LastReport().outside_extent, 0u);
+  EXPECT_FALSE(fusion.LastReport().geometry_mismatch);
+  EXPECT_TRUE(fusion.LastReport().has_bounds);
+}

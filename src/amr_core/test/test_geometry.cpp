@@ -58,7 +58,8 @@ TEST(QuaternionTest, PitchRoundTripsAndSaturatesAtGimbalLock) {
     EXPECT_NEAR(PitchFromQuaternion(0.0, qy, 0.0, qw), pitch, 1e-9) << "pitch=" << pitch;
   }
   // Straight up: asin() must not be handed an argument above 1 by rounding.
-  EXPECT_NEAR(PitchFromQuaternion(0.0, std::sin(M_PI / 4.0), 0.0, std::cos(M_PI / 4.0)),
+  EXPECT_NEAR(
+    PitchFromQuaternion(0.0, std::sin(M_PI / 4.0), 0.0, std::cos(M_PI / 4.0)),
     M_PI / 2.0, 1e-9);
 }
 

@@ -32,6 +32,14 @@ if(BUILD_TESTING)
   set(ament_cmake_copyright_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
   ament_add_pytest_test(fleet_config_test test/test_fleet_loader.py)
+  # Structural guard: no per-robot node may escape its namespace.
+  ament_add_pytest_test(launch_namespacing_test test/test_launch_namespacing.py)
+  # Guards the map -> base_footprint chain: the robot's start pose must appear
+  # in exactly one link. See DESIGN_NOTES 8b.
+  ament_add_pytest_test(frame_chain_test test/test_frame_chain.py)
+  # Guards against a Node subclass shadowing a read-only rclpy property, which
+  # raises only when the constructor runs. See DESIGN_NOTES 8c.
+  ament_add_pytest_test(node_shadowing_test test/test_node_attribute_shadowing.py)
 endif()
 
 ament_package()

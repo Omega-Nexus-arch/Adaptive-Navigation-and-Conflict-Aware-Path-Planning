@@ -44,7 +44,10 @@ void MapFusion::Reset()
 
 std::size_t MapFusion::Integrate(const MapContribution & contribution)
 {
+  last_report_ = IntegrationReport();
+
   if (contribution.data.size() != contribution.info.CellCount()) {
+    last_report_.geometry_mismatch = true;
     return 0;
   }
 
@@ -62,6 +65,7 @@ std::size_t MapFusion::Integrate(const MapContribution & contribution)
       // Skipping it is what makes the two components compose: absence of new
       // evidence must not be read as evidence of absence.
       if (value == kUnknown) {
+        ++last_report_.skipped_unknown;
         continue;
       }
 
@@ -76,10 +80,24 @@ std::size_t MapFusion::Integrate(const MapContribution & contribution)
       const double global_y =
         contribution.offset_y + local_x * sin_yaw + local_y * cos_yaw;
 
+      // Track where this robot's evidence actually lands. When none of it
+      // lands inside the grid, this box is what names the reason.
+      if (!last_report_.has_bounds) {
+        last_report_.has_bounds = true;
+        last_report_.min_x = last_report_.max_x = global_x;
+        last_report_.min_y = last_report_.max_y = global_y;
+      } else {
+        last_report_.min_x = std::min(last_report_.min_x, global_x);
+        last_report_.max_x = std::max(last_report_.max_x, global_x);
+        last_report_.min_y = std::min(last_report_.min_y, global_y);
+        last_report_.max_y = std::max(last_report_.max_y, global_y);
+      }
+
       int target_column = 0;
       int target_row = 0;
       if (!info_.ToCell(global_x, global_y, &target_column, &target_row)) {
-        continue;   // Outside the merged extent.
+        ++last_report_.outside_extent;
+        continue;
       }
 
       const std::size_t target_index = info_.Index(target_column, target_row);
@@ -95,6 +113,7 @@ std::size_t MapFusion::Integrate(const MapContribution & contribution)
     }
   }
 
+  last_report_.updated = updated;
   return updated;
 }
 

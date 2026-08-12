@@ -30,7 +30,7 @@ namespace amr_sensor_bsp
 ///   ---------------              ---------              ----------------
 ///   scan_raw                --> [ LidarValidator  ] --> scan
 ///   imu_raw                 --> [ ImuValidator    ] --> imu
-///   camera/image_unvalidated--> [ CameraValidator ] --> camera/image_raw
+///   camera_raw/image_raw    --> [ CameraValidator ] --> camera/image_raw
 ///                                       |
 ///                                       +-----------> sensor_health
 /// ```
@@ -91,7 +91,7 @@ public:
       "imu_raw", rclcpp::SensorDataQoS(),
       [this](sensor_msgs::msg::Imu::SharedPtr message) {OnImu(message);});
     image_subscription_ = create_subscription<sensor_msgs::msg::Image>(
-      "camera/image_unvalidated", rclcpp::SensorDataQoS(),
+      "camera_raw/image_raw", rclcpp::SensorDataQoS(),
       [this](sensor_msgs::msg::Image::SharedPtr message) {OnImage(message);});
 
     report_timer_ = create_wall_timer(
@@ -282,7 +282,7 @@ private:
     // be missed, because there are no error messages to notice.
     WarnIfSilent(*lidar_, "scan_raw");
     WarnIfSilent(*imu_, "imu_raw");
-    WarnIfSilent(*camera_, "camera/image_unvalidated");
+    WarnIfSilent(*camera_, "camera_raw/image_raw");
   }
 
   void WarnIfSilent(const SensorValidator & validator, const char * topic)

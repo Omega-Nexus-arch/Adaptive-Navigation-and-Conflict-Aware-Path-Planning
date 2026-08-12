@@ -17,7 +17,7 @@ advisory.
 import os
 
 from ament_index_python.packages import get_package_share_directory
-from amr_bringup.fleet_loader import load_fleet, nav2_substitutions
+from amr_bringup.fleet_loader import load_fleet, map_substitutions, nav2_substitutions
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
@@ -56,9 +56,24 @@ def _navigation_nodes(context, *args, **kwargs):
     # carries, so the global costmap stays anchored to `map` while the rolling
     # local costmap gets `<robot>/odom`. RewrittenYaml cannot express this: it
     # matches on key name, so one `global_frame` rewrite would hit both.
+    textual = {'<ns>': robot_name}
+    textual.update(map_substitutions(fleet['map_extents']))
+
     template = os.path.join(bringup_share, 'config', 'nav2_params.yaml')
     with open(template, 'r', encoding='utf-8') as handle:
-        expanded = handle.read().replace('<ns>', robot_name)
+        expanded = handle.read()
+    for placeholder, value in textual.items():
+        expanded = expanded.replace(placeholder, value)
+
+    # A surviving `<...>` means a placeholder was added to the YAML and not to
+    # the substitution map. That would reach nav2 as an unparseable value and
+    # surface as a generic parameter error, so name it here instead.
+    for line_number, line in enumerate(expanded.splitlines(), start=1):
+        stripped = line.split('#', 1)[0]
+        if '<' in stripped and '>' in stripped:
+            raise RuntimeError(
+                f'nav2_params.yaml line {line_number} still contains an '
+                f'unsubstituted placeholder after expansion: {line.strip()!r}')
 
     # Written next to the other build artefacts rather than /tmp so the exact
     # parameters a robot was launched with can be inspected after the fact.

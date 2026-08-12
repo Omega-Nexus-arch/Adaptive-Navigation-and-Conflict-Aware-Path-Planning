@@ -90,7 +90,8 @@ public:
     const std::map<std::string, PredictedPath> & paths, double now) const;
 
   /// \brief Test a single pair. Exposed for unit tests and diagnostics.
-  bool DetectPair(const PredictedPath & a, const PredictedPath & b, double now,
+  bool DetectPair(
+    const PredictedPath & a, const PredictedPath & b, double now,
     Conflict * conflict) const;
 
 private:
