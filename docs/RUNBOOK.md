@@ -52,7 +52,7 @@ colcon test --event-handlers console_direct+
 colcon test-result --verbose
 ```
 
-**Check:** 250 tests, 0 failures. This alone validates the motion smoother, the
+**Check:** 254 tests, 0 failures. This alone validates the motion smoother, the
 safety envelope, conflict detection, the yielding protocol, the sensor
 validators, selective mapping, map fusion, the slope cost model, the world
 geometry and every config loader.

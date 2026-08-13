@@ -8,20 +8,20 @@ dynamic_obstacle_driver:
     obstacle_names: ["ped_0", "ped_1", "ped_2", "ped_3", "thirdparty_0", "thirdparty_1"]
     ped_0:
       speed: 0.9
-      kind: "cylinder"
-      waypoints: [-14.0, -7.3, -6.0, -7.3, -6.0, -3.8, -14.0, -3.8]
+      kind: "box"
+      waypoints: [-14.0, -7.3, -3.5, -7.3, -3.5, -12.5, -7.5, -12.5, -7.5, -7.3]
     ped_1:
       speed: 0.75
       kind: "cylinder"
-      waypoints: [-12.0, 7.3, -12.0, 10.7, -18.0, 10.7, -18.0, 7.3]
+      waypoints: [-12.0, 7.3, -12.0, 10.7, -16.5, 10.7, -16.5, 7.3]
     ped_2:
       speed: 1.05
       kind: "cylinder"
       waypoints: [8.0, -3.0, 16.0, -3.0, 16.0, 3.0, 8.0, 3.0]
     ped_3:
-      speed: 0.85
-      kind: "cylinder"
-      waypoints: [3.0, -2.0, 3.0, 2.0, 8.0, 2.0, 8.0, -2.0]
+      speed: 0.6
+      kind: "box"
+      waypoints: [3.0, -5.0, 3.0, 0.0, 12.0, 0.0, 12.0, -5.0]
     thirdparty_0:
       speed: 0.7
       kind: "box"

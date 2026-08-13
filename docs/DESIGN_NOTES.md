@@ -781,7 +781,7 @@ quantities in the system before reading any more logs.**
 
 Honest gaps, roughly in the order I would close them.
 
-1. **Integration tests under `launch_testing`.** The 250 automated tests cover the
+1. **Integration tests under `launch_testing`.** The 254 automated tests cover the
    algorithms thoroughly and the node wiring not at all. A `launch_testing`
    suite that brings up two robots headless and asserts on `/cmd_vel` and
    `/fleet/traffic_directives` would cover the seam between them.

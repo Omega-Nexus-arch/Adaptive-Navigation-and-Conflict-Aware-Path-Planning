@@ -425,6 +425,95 @@ def test_no_dynamic_obstacle_spawns_inside_geometry(spec):
             )
 
 
+def test_every_dynamic_obstacle_starts_on_its_own_loop(spec):
+    """Spawn pose must be the first waypoint.
+
+    When it is not, the obstacle's first move is an unplanned dash from
+    wherever it was spawned to wherever the loop begins -- through whatever
+    happens to be in between. `ped_0` shipped with its first waypoint's sign
+    dropped (`14.0` for `-14.0`), which sent it 28 m across the warehouse and
+    straight through the central firewall on its very first leg.
+    """
+    for obs in spec.dynamics:
+        first_x, first_y = obs.waypoints[0]
+        assert (obs.start_x, obs.start_y) == pytest.approx((first_x, first_y)), (
+            f'{obs.name} spawns at ({obs.start_x}, {obs.start_y}) but its loop '
+            f'begins at ({first_x}, {first_y}); its first move would be a dash '
+            f'between the two, ignoring anything in the way'
+        )
+
+
+def test_no_patrol_leg_passes_through_a_static_body(spec):
+    """The waypoints being clear is not enough; the legs between them must be.
+
+    ``test_no_dynamic_obstacle_spawns_inside_geometry`` already checks the
+    waypoints, and it passed with the sign error above, because (14.0, -7.3)
+    is perfectly good floor. What was wrong was the *path* to it. Sampling the
+    legs is what turns a set of valid points into a valid route.
+    """
+    def clearance(x, y):
+        """Distance from a point to the nearest static body, 0 if inside one."""
+        nearest = float('inf')
+        for box in spec.boxes:
+            if box.yaw:
+                continue          # yawed bodies are handled by the grid check
+            dx = max(abs(x - box.x) - box.size_x / 2.0, 0.0)
+            dy = max(abs(y - box.y) - box.size_y / 2.0, 0.0)
+            nearest = min(nearest, math.hypot(dx, dy))
+        return nearest
+
+    for obs in spec.dynamics:
+        loop = [tuple(point) for point in obs.waypoints]
+        for start, end in zip(loop, loop[1:] + loop[:1]):
+            length = math.hypot(end[0] - start[0], end[1] - start[1])
+            steps = max(2, int(length / 0.05))
+            for step in range(steps + 1):
+                t = step / steps
+                x = start[0] + t * (end[0] - start[0])
+                y = start[1] + t * (end[1] - start[1])
+                # The body has width. Checking the centre line only would pass
+                # a loop that scrapes along a rack face.
+                assert clearance(x, y) >= obs.radius, (
+                    f'{obs.name}: the leg {start} -> {end} comes within '
+                    f'{clearance(x, y):.2f} m of a static body at '
+                    f'({x:.2f}, {y:.2f}), closer than its own {obs.radius} m '
+                    f'radius. The obstacle would grind against it, or tunnel '
+                    f'through it and present the fleet an obstacle that no '
+                    f'sensor ever saw arrive.'
+                )
+
+
+def test_patrol_loops_are_closed_and_non_degenerate(spec):
+    """A loop needs at least a triangle, and no repeated points."""
+    for obs in spec.dynamics:
+        loop = [tuple(w) for w in obs.waypoints]
+        assert len(loop) >= 3, f'{obs.name} has only {len(loop)} waypoints'
+        assert len(set(loop)) == len(loop), \
+            f'{obs.name} repeats a waypoint, so it would stall there'
+        assert obs.speed > 0.0, f'{obs.name} has a non-positive speed'
+
+
+def test_the_generated_config_matches_the_spec(spec):
+    """dynamic_obstacles.yaml is generated; hand-editing it would be lost.
+
+    This asserts the round trip, so a change made in the YAML instead of in
+    world_builder.py is caught the next time the world is regenerated rather
+    than silently reverted.
+    """
+    import yaml as yaml_module
+    rendered = yaml_module.safe_load(
+        wb.render_dynamic_obstacles(spec))
+    params = rendered['dynamic_obstacle_driver']['ros__parameters']
+
+    assert params['obstacle_names'] == [o.name for o in spec.dynamics]
+    for obs in spec.dynamics:
+        entry = params[obs.name]
+        assert entry['speed'] == pytest.approx(obs.speed)
+        assert entry['kind'] == obs.shape
+        flat = [coordinate for point in obs.waypoints for coordinate in point]
+        assert entry['waypoints'] == pytest.approx(flat)
+
+
 # ---------------------------------------------------------------------------
 # SDF sanity
 # ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@ behaviour regresses. **Demo** means a script that exits non-zero on failure.
 | 1.3 | **Large multi-level structure with ramps** | 44×30 m world; Hump Bridge 0.55 m with 8.7° ramps, mezzanine deck 0.45 m with 7.8° and 14.8° ramps | Test: `test_ramp_gradients_match_documentation`, `test_ramp_slab_pose_matches_elevation_model` |
 | 1.4 | **Complex, initially unknown aisle layouts** | Three rack blocks, 2.4 m aisles, cross-aisles; no prior map — SLAM starts blank | Test: `test_primary_goals_are_reachable_from_the_docks` |
 | 1.5 | **Static storage racks** | `_storage_block()` generates segmented rows | Test: `test_no_waypoint_sits_inside_an_obstacle` |
-| 1.6 | **Frequent randomly moving dynamic obstacles** | 6 collision-bearing models (4 pedestrians, 2 third-party robots) on seeded patrol loops with dwell and corner-cutting | Test: `test_no_dynamic_obstacle_spawns_inside_geometry`, `test_dynamic_obstacles_expose_a_cmd_vel_interface` |
+| 1.6 | **Frequent randomly moving dynamic obstacles** | 6 collision-bearing models (4 pedestrians, 2 third-party robots) on seeded patrol loops with dwell and corner-cutting | Test: `test_no_dynamic_obstacle_spawns_inside_geometry`, `test_no_patrol_leg_passes_through_a_static_body` (samples every leg at 5 cm, inflated by the body radius), `test_every_dynamic_obstacle_starts_on_its_own_loop`, `test_dynamic_obstacles_expose_a_cmd_vel_interface` |
 
 > Gazebo Classic `<actor>` elements have no collision geometry and are invisible
 > to a LiDAR. Real models are used so obstacle avoidance is genuine.
@@ -94,7 +94,7 @@ behaviour regresses. **Demo** means a script that exits non-zero on failure.
 | **Motion Control** | Observably smooth; velocity profile modulates with environment | Jerk-limited S-curve; `SmootherDiagnostics` reports which constraint bound each tick, so smoothness is attributable rather than assumed |
 | **Custom Integration** | Functional HAL class used by the nav node; validation runs and logs for IMU and camera | `amr_sensor_bsp` gates every sensor stream structurally; `SensorHealth` telemetry per stream |
 | **System Optimization** | Programmatically restrict the map update area on a defined condition | `SelectiveMappingPolicy` with a four-way cell classification; `MapUpdateStats` publishes the achieved suppression ratio |
-| **Code Quality & Build** | Clean, commented, modular; builds cleanly; compelling refactoring demo | 9 packages, ROS-free algorithm cores, 250 tests, `REFACTORING.md` |
+| **Code Quality & Build** | Clean, commented, modular; builds cleanly; compelling refactoring demo | 9 packages, ROS-free algorithm cores, 254 tests, `REFACTORING.md` |
 
 ---
 

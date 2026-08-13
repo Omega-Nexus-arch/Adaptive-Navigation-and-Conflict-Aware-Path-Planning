@@ -1302,22 +1302,22 @@
       <pose>-14.0000 -7.3000 0.8750 0 0 0</pose>
       <link name="link">
         <inertial>
-          <mass>70.00</mass>
+          <mass>40.00</mass>
           <inertia>
-            <ixx>17.8646</ixx><ixy>0</ixy><ixz>0</ixz>
-            <iyy>17.8646</iyy><iyz>0</iyz>
-            <izz>3.5840</izz>
+            <ixx>10.2083</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>10.2083</iyy><iyz>0</iyz>
+            <izz>2.0480</izz>
           </inertia>
         </inertial>
         <collision name="collision">
-          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+          <geometry><box><size>0.640 0.640 1.750</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+          <geometry><box><size>0.640 0.640 1.750</size></box></geometry>
           <material>
             <script>
               <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Purple</name>
+              <name>Gazebo/Yellow</name>
             </script>
           </material>
         </visual>
@@ -1437,21 +1437,21 @@
     </model>
 
     <model name="ped_3">
-      <pose>3.0000 -2.0000 0.8750 0 0 0</pose>
+      <pose>3.0000 -5.0000 0.8750 0 0 0</pose>
       <link name="link">
         <inertial>
-          <mass>70.00</mass>
+          <mass>40.00</mass>
           <inertia>
-            <ixx>17.8646</ixx><ixy>0</ixy><ixz>0</ixz>
-            <iyy>17.8646</iyy><iyz>0</iyz>
-            <izz>3.5840</izz>
+            <ixx>10.2083</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>10.2083</iyy><iyz>0</iyz>
+            <izz>2.0480</izz>
           </inertia>
         </inertial>
         <collision name="collision">
-          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+          <geometry><box><size>0.640 0.640 1.750</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><cylinder><radius>0.320</radius><length>1.750</length></cylinder></geometry>
+          <geometry><box><size>0.640 0.640 1.750</size></box></geometry>
           <material>
             <script>
               <uri>file://media/materials/scripts/gazebo.material</uri>

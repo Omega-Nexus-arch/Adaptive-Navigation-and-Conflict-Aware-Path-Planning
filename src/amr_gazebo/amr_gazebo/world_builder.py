@@ -400,13 +400,26 @@ def build_warehouse() -> WorldSpec:
     # corridor, i.e. exactly where the fleet has to negotiate.
     spec.dynamics += [
         DynamicObstacle(
-            'ped_0', 'cylinder', 0.32, 1.75, -14.0, -7.3,
-            waypoints=((-14.0, -7.3), (-6.0, -7.3), (-6.0, -3.8), (-14.0, -3.8)),
-            speed=0.9, material='Gazebo/Purple',
+            # The first waypoint is -14.0, not 14.0. With the sign dropped this
+            # pedestrian spawned in the west aisle and immediately set off for
+            # x = +14, straight through the central firewall and The Pinch --
+            # 28 m of travel that no aisle actually connects. Every loop below
+            # now begins at the model's own spawn pose, and
+            # test_world_generation.py asserts it.
+            'ped_0', 'box', 0.32, 1.75, -14.0, -7.3,
+            waypoints=((-14.0, -7.3), (-3.5, -7.3), (-3.5, -12.5), (-7.5, -12.5), (-7.5, -7.3)),
+            speed=0.9, material='Gazebo/Yellow',
         ),
         DynamicObstacle(
+            # West side is x = -16.5, NOT -18.0. The free cross-aisles in this
+            # rack block run at x = -16.5 and x = -12.0; a leg down x = -18
+            # passes straight through the rack row spanning y = 8.5..9.5. The
+            # four waypoints were each on clear floor, which is why the
+            # existing waypoint check passed -- it was the legs between them
+            # that were solid. At -16.5 the loop clears the racks by 0.40 m
+            # against a 0.32 m body radius.
             'ped_1', 'cylinder', 0.32, 1.75, -12.0, 7.3,
-            waypoints=((-12.0, 7.3), (-12.0, 10.7), (-18.0, 10.7), (-18.0, 7.3)),
+            waypoints=((-12.0, 7.3), (-12.0, 10.7), (-16.5, 10.7), (-16.5, 7.3)),
             speed=0.75, material='Gazebo/Purple',
         ),
         DynamicObstacle(
@@ -415,9 +428,12 @@ def build_warehouse() -> WorldSpec:
             speed=1.05, material='Gazebo/Purple',
         ),
         DynamicObstacle(
-            'ped_3', 'cylinder', 0.32, 1.75, 3.0, -2.0,
-            waypoints=((3.0, -2.0), (3.0, 2.0), (8.0, 2.0), (8.0, -2.0)),
-            speed=0.85, material='Gazebo/Purple',
+            # Spawns on its loop, at (3.0, -5.0). The slowest pedestrian:
+            # it crosses the east-west corridor, so a fast one would clear the
+            # junction before either AMR ever had to react to it.
+            'ped_3', 'box', 0.32, 1.75, 3.0, -5.0,
+            waypoints=((3.0, -5.0), (3.0, 0.0), (12.0, 0.0), (12.0, -5.0)),
+            speed=0.6, material='Gazebo/Purple',
         ),
         DynamicObstacle(
             'thirdparty_0', 'box', 0.45, 0.5, -8.0, 0.0,
