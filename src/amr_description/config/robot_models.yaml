@@ -71,6 +71,17 @@ heavy_mapper:
   yield_priority: 100
 
   # ---- Sensors -------------------------------------------------------------
+  # ---- Terrain ------------------------------------------------------------
+  # Steepest grade this model accepts. Feeds amr_navigation's SlopeLayer: cost
+  # rises from `base_cost` at the free angle to just below LETHAL here, so the
+  # planner prices ramps steeply without ever declaring them impassable.
+  # Loaded, higher centre of mass, trailing casters: the cautious limit.
+  #
+  # This was absent before, so nav2_substitutions fell back to its 16.0 default
+  # and BOTH models were given the same limit -- the per-model climbing ability
+  # the code comments claimed was never actually expressed. See DESIGN_NOTES 8e.
+  max_traversable_angle_degrees: 10.0
+
   lidar:
     # ABOVE THE CARGO DECK, ON A MAST. base_z_offset + chassis_height + deck
     # = 0.13 + 0.34 + 0.024 = 0.494 m, so anything at or below that is INSIDE
@@ -151,6 +162,17 @@ light_scout:
   safety_sector_half_angle: 1.3963   # +/- 80 deg guarded cone [rad]
 
   yield_priority: 50           # yields to the heavy mapper
+
+  # ---- Terrain ------------------------------------------------------------
+  # Steepest grade this model accepts. Feeds amr_navigation's SlopeLayer: cost
+  # rises from `base_cost` at the free angle to just below LETHAL here, so the
+  # planner prices ramps steeply without ever declaring them impassable.
+  # Lighter and lower-slung, so it tolerates a steeper grade than the mapper.
+  #
+  # This was absent before, so nav2_substitutions fell back to its 16.0 default
+  # and BOTH models were given the same limit -- the per-model climbing ability
+  # the code comments claimed was never actually expressed. See DESIGN_NOTES 8e.
+  max_traversable_angle_degrees: 12.0
 
   lidar:
     # Above this model's cargo deck (0.10 + 0.26 + 0.024 = 0.384 m); see the

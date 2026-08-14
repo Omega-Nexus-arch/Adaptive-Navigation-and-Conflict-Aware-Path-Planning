@@ -1,32 +1,41 @@
 # GENERATED FILE - regenerate with: ros2 run amr_gazebo generate_world.py
 #
-# Patrol loops for amr_gazebo/dynamic_obstacle_driver.py. Each obstacle
-# is a real Gazebo model with collision geometry, so the fleet
-# genuinely has to sense and avoid it.
+# Patrol loops for amr_gazebo/dynamic_obstacle_driver.py.
+#
+# ONLY the driven obstacles appear here. The pedestrians are animated
+# Gazebo actors whose trajectory is scripted into the world itself, so
+# nothing at runtime steers them -- which is precisely why they can no
+# longer wedge themselves against a rack. Their loops are still listed
+# below the driver block, unused by it, so the geometry tests and a
+# human reader can see all six in one place.
 dynamic_obstacle_driver:
   ros__parameters:
-    obstacle_names: ["ped_0", "ped_1", "ped_2", "ped_3", "thirdparty_0", "thirdparty_1"]
+    obstacle_names: ["thirdparty_0", "thirdparty_1"]
+    # scripted actor - not driven
     ped_0:
       speed: 0.9
-      kind: "box"
-      waypoints: [-14.0, -7.3, -3.5, -7.3, -3.5, -12.5, -7.5, -12.5, -7.5, -7.3]
+      kind: "human"
+      waypoints: [-14.0, 1.0, -9.0, 1.0, -9.0, -2.0, -14.0, -2.0]
+    # scripted actor - not driven
     ped_1:
       speed: 0.75
-      kind: "cylinder"
-      waypoints: [-12.0, 7.3, -12.0, 10.7, -16.5, 10.7, -16.5, 7.3]
+      kind: "human"
+      waypoints: [-5.0, 7.8, -3.0, 7.8, -3.0, 12.2, -5.0, 12.2]
+    # scripted actor - not driven
     ped_2:
       speed: 1.05
-      kind: "cylinder"
-      waypoints: [8.0, -3.0, 16.0, -3.0, 16.0, 3.0, 8.0, 3.0]
+      kind: "human"
+      waypoints: [5.5, -1.2, 13.0, -1.2, 13.0, -3.2, 5.5, -3.2]
+    # scripted actor - not driven
     ped_3:
       speed: 0.6
-      kind: "box"
-      waypoints: [3.0, -5.0, 3.0, 0.0, 12.0, 0.0, 12.0, -5.0]
+      kind: "human"
+      waypoints: [11.0, 2.5, 14.0, 2.5, 14.0, 0.5, 11.0, 0.5]
     thirdparty_0:
       speed: 0.7
       kind: "box"
-      waypoints: [-8.0, 0.0, -8.0, -4.0, -16.0, -4.0, -16.0, 0.0]
+      waypoints: [-3.5, -5.0, -1.8, -5.0, -1.8, -11.5, -3.5, -11.5]
     thirdparty_1:
       speed: 0.8
       kind: "box"
-      waypoints: [10.0, 0.0, 16.0, 0.0, 16.0, 5.5, 10.0, 5.5]
+      waypoints: [5.5, -5.0, 13.0, -5.0, 13.0, -7.0, 5.5, -7.0]

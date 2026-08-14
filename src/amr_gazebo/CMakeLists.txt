@@ -20,6 +20,7 @@ install(
   PROGRAMS
     scripts/generate_world.py
     scripts/dynamic_obstacle_driver.py
+    scripts/render_layout_map.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

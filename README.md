@@ -127,7 +127,7 @@ Two structural decisions run through the whole codebase:
 **Algorithms are ROS-free.** `MotionSmoother`, `SafetyMonitor`,
 `ConflictDetector`, `YieldPolicy`, `SelectiveMappingPolicy`, `MapFusion`,
 `SlopeCostModel` and the three sensor validators are plain C++ classes with no
-`rclcpp` dependency. The nodes are thin adapters. That is why 254 automated tests can
+`rclcpp` dependency. The nodes are thin adapters. That is why 268 automated tests can
 exercise the control laws directly — including timings and failure modes that
 are impractical to stage in a simulator — instead of inferring behaviour by
 watching a robot.
@@ -374,7 +374,7 @@ colcon test --event-handlers console_direct+
 colcon test-result --verbose
 ```
 
-**254 tests**, all passing:
+**268 tests**, all passing:
 
 | Suite | Tests | What it covers |
 |---|---:|---|

@@ -16,6 +16,6 @@ free_thresh: 0.01
 mode: raw
 
 elevation_min: 0.0
-elevation_max: 0.69
+elevation_max: 0.5
 width: 880
 height: 600

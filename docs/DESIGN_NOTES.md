@@ -103,8 +103,8 @@ smoother, because a smooth ramp-down is the wrong answer to "stop now".
 
 The requirement wants ramps that the planner reasons about. A fixed, level 2D
 LiDAR on a robot climbing a ramp pitches with the chassis, so its beam tilts
-down and strikes the floor ahead: at AMR-1's 0.42 m mounting height on an 8.7°
-ramp, that is 2.78 m in front. The costmap fills with a phantom wall across the
+down and strikes the floor ahead: at AMR-1's 0.60 m mounting height on a 6.0°
+ramp, that is 5.74 m in front. The costmap fills with a phantom wall across the
 ramp, the planner declares it impassable, and the entire slope-cost experiment
 quietly evaluates nothing.
 
@@ -777,11 +777,332 @@ quantities in the system before reading any more logs.**
 
 ---
 
+## 8e. Ramps nothing could climb
+
+The mezzanine's "steep maintenance ramp" was **14.8 deg -- a 26.5% grade**. For
+scale: wheelchair ramps are capped at 8.3%, loading docks run 10-15%, and a
+warehouse AMR with trailing casters is specified for 5-8%. Nothing in this
+fleet was ever going to climb it, so `mezzanine_storage` -- the goal whose
+entire purpose is to prove the planner will use a ramp when it is *the only
+viable path* -- could never succeed. The scenario was untestable, and the test
+that was supposed to cover it only checked reachability on the grid, which is
+geometry, not traction.
+
+The brief sets no numeric limit. It asks for ramps that exist so terrain cost
+has something to price, and for the planner to avoid them unless necessary.
+Gradient is therefore a free variable, and the honest choice is the one a real
+warehouse would build.
+
+| | before | after |
+|---|---|---|
+| Hump bridge ramps | 8.7 deg (15.3%) | **6.0 deg (10.5%)** |
+| Mezzanine, gentle | 7.8 deg (13.6%) | **5.0 deg (8.8%)** |
+| Mezzanine, steep | 14.8 deg (26.5%) | **9.0 deg (15.9%)** |
+
+Reducing gradient means lengthening the run, and the runs then collide: at
+6 deg the hump's east ramp needs 5.25 m and reaches x = 6.85, straight through
+the mezzanine's gentle ramp at x = 5.5. Deck height is what sets the run, so
+the decks came down with the gradients -- hump 0.55 -> 0.38 m, mezzanine
+0.45 -> 0.40 m. `test_floor_surfaces_do_not_overlap` caught the collision on
+the first attempt, which is exactly what it was written for.
+
+**The second half of the fix.** `max_traversable_angle_degrees` was never
+defined in `robot_models.yaml` at all, so `nav2_substitutions` fell back to its
+`16.0` default and **both models got the same limit** -- the per-model climbing
+ability the comments claimed was never actually expressed anywhere. It is now a
+real per-model property: 10 deg for the loaded mapper, 12 deg for the lighter
+scout. The slope cost that results still discriminates sharply, which is what
+keeps the A/B/C experiment meaningful:
+
+| ramp | deg | heavy_mapper | light_scout |
+|---|---|---|---|
+| mezz gentle | 5.0 | 70 | 59 |
+| hump | 6.0 | 93 | 74 |
+| mezz steep | 9.0 | **202** | **144** |
+
+All strictly below `INSCRIBED_INFLATED_OBSTACLE` (253), so the steep ramp stays
+expensive without ever becoming impassable -- which is the exact shape the
+requirement asks for.
+
+**The transferable lesson.** A parameter with a plausible default is a
+parameter nobody notices is missing. Two robots shared one climbing limit for
+the entire life of the project, and the only visible symptom was a ramp neither
+of them could climb.
+
+---
+
+## 8f. A running human the LiDAR can still see
+
+Two requirements that pull against each other, and the reference warehouse
+world only satisfies one of them.
+
+**Animation.** Gazebo Classic's `<actor>` is the only way to get moving limbs.
+The reference world uses `run.dae` -- the running skin -- and so does this one
+now. Same file, resolved from Gazebo's own media path, nothing vendored.
+
+**Detectability.** An actor is a visual. Its collisions are auto-generated from
+the skeleton as **2 cm spheres**, one per bone, which is what the reference
+world ships: 279 of them, none larger than a marble. A 2D LiDAR sweeps straight
+through a crowd of them. For a world whose entire purpose is sensing and
+avoidance, that is a room full of ghosts.
+
+So the collisions are declared explicitly, and declared *where the scan is*:
+
+```python
+HUMAN_BONE_COLLISIONS = {'LeftLeg': 0.22, 'RightLeg': 0.22, 'Hips': 0.40}
+HUMAN_KNEE_HEIGHT = 0.55
+```
+
+Both robot models scan between 0.48 m and 0.60 m. On a 1.8 m skeleton that is
+knee height, so the knees carry the collision and the hips fill in the torso.
+Spheres, not boxes, because a bone's frame is rotated -- the skeleton is Y-up --
+and a sphere is the one shape that does not care how it is oriented.
+`test_pedestrians_are_animated_actors_the_lidar_can_still_see` checks the
+arithmetic: every scan height must fall inside a knee sphere.
+
+**The bonus, which is really the point.** An actor is kinematic. It follows its
+script regardless of contacts, so it *cannot* wedge itself against a rack. The
+previous pedestrians were physics-driven through `libgazebo_ros_planar_move`,
+which is why they jammed: a controller pushing a body into geometry stalls, and
+no amount of path tuning removes that failure mode, it only makes it rarer.
+Scripting removes it by construction.
+
+Two details the script has to get right, both now asserted:
+
+* **Timestamps must strictly increase.** The arrival at the end of one leg and
+  the start of the next leg's turn are the same instant, and emitting both --
+  the obvious way to write the loop -- gives Gazebo a zero-length interval to
+  interpolate across. The first version did exactly that.
+* **Corners are pivots, not slides.** Without a short turn-on-the-spot waypoint
+  Gazebo interpolates yaw across the whole following leg, and the runner crabs
+  sideways down the aisle.
+
+The third-party units stay driven models. They are robots, and a robot that can
+be blocked is the more honest simulation -- they just needed room to work.
+
+---
+
+## 8g. Clearance is the fix, not path tuning
+
+The obstacles were getting stuck, and the loops were technically legal when
+they did: every one cleared static geometry by more than its own radius. The
+tightest was **0.40 m of clearance against a 0.32 m body -- eight centimetres of
+margin**, threaded between two rack rows.
+
+That is the wrong target. A margin measured in centimetres is a margin that
+survives in the geometry checker and dies against contact dynamics, odometry
+drift and a controller that overshoots a corner. The loops now require **1.2 m
+of clearance minimum**, and are routed through the warehouse's genuinely open
+floor rather than through the gaps:
+
+| | before | after |
+|---|---|---|
+| Worst clearance | 0.40 m | **1.30 m** |
+| Tightest pair separation, beyond requirement | 0.00 m | **0.70 m** |
+
+Finding that floor took a clearance map rather than guesswork -- rendering the
+distance-to-nearest-body field over the whole warehouse and reading the open
+regions off it, instead of picking coordinates that looked reasonable in a list.
+Every loop still crosses an AMR route, so the extra room costs nothing in
+obstruction: `ped_0` and `ped_3` both straddle AMR-2's run at the Pinch,
+`thirdparty_1` sits on the staging transit.
+
+**The transferable lesson.** "Clears the obstacle" and "is a route something can
+actually drive" are different claims, and the first is much easier to test. When
+a check passes and the thing still fails, suspect the threshold before the
+implementation.
+
+---
+
+## 8h. Traffic where it helps, not where it hurts
+
+Three problems, one root cause: the loops were placed to *maximise* obstruction,
+and obstruction is not uniformly valuable.
+
+**A pedestrian 0.50 m from a dock.** `ped_0`'s west leg ran down x = -18, and
+`dock_b` is at (-18.5, 0.0). The robot had to negotiate traffic before it had
+left its charging plate. That tests nothing except whether nav2 can escape a
+box.
+
+**A pedestrian 2.5 m from The Pinch.** The doorway is 2.0 m wide and both AMRs
+cross it in opposite directions -- already the hardest moment in the scenario.
+A third body loitering there converts a negotiation into a blockage, and a
+blockage proves nothing about yielding.
+
+**Yellow jambs inside the doorway.** Two 1.2 m markers at y = ±1.05, added so
+the gap would be legible in Gazebo and RViz. They protrude 0.1 m past each face
+of the firewall, so the LiDAR returns them as obstacles *at the mouth of the
+gap*; once the inflation layer rounds them the usable corridor is narrower than
+the 2.0 m the firewall actually leaves. A legibility aid that changes the
+geometry it is describing is not a legibility aid.
+
+All three are now standoffs with a number attached, and a test each:
+
+```python
+DOCK_STANDOFF  = 3.5   # m from either charging plate
+PINCH_STANDOFF = 4.5   # m from the doorway centre
+```
+
+| | before | after |
+|---|---|---|
+| `ped_0` to `dock_b` | 0.50 m | **4.50 m** |
+| `ped_3` to The Pinch | 2.50 m | **11.01 m** |
+| Objects inside the doorway | 2 jambs | **none** |
+
+The obstruction that matters is untouched: `ped_0` still crosses AMR-2's
+eastbound corridor, `ped_3` still sits on its final approach to Packing Bay 4,
+`thirdparty_1` still occupies the staging transit. What changed is *where* --
+mid-corridor, where a robot has room to plan around a moving body, rather than
+at the two pinch points where it has none.
+
+**The transferable lesson.** "Does this obstacle get in the way?" is the wrong
+question to tune against; it has a trivially maximal answer. The useful question
+is whether the robot is left with a decision to make. A doorway with traffic
+parked in it, and a robot boxed in on its own dock, both remove the decision --
+in opposite directions, and neither is a test.
+
+---
+
+## 8i. A 0.9 m hole in a wall is not a route
+
+The rack rows were built from 3.6 m segments with **0.9 m gaps** between them,
+on the reasonable-sounding theory that cross-aisles give the global planner
+route choices instead of a single corridor.
+
+The AMRs are **1.10 m wide**. So every one of those gaps was too narrow to drive
+through -- and, critically, *not narrow enough for the costmap to write off*.
+Inflated by a 0.55 m radius the gap closes, but only just, and the planner would
+still occasionally thread a path through one. The robot would commit, enter, and
+wedge. That is the screenshot: an AMR nose-first between two racks.
+
+The failure is worth naming precisely, because "make the gap wider" and "make
+the gap narrower" are both correct fixes and the choice matters. A gap has to be
+either **comfortably drivable** or **obviously closed**; anything between the
+two is a trap that only fires sometimes, which is the worst kind. Widening every
+gap to 2 m would have turned the block into a grid with no through-route
+decisions left to make. So the rows are now **continuous**, and an aisle is
+entered around the end of a row -- which is how warehouse traffic actually
+works, and which gives the planner a real choice (*which end*) in place of a
+dozen false ones.
+
+**And `heavy_storage` moved with it.** The block went from three rows to two, so
+the goal sits in an aisle with exactly one row on each side rather than buried
+mid-block, and it moved to **(-15.0, -10.7)** -- deep enough that AMR-1 has to
+run the length of the block and turn in at the east mouth. The rows now reach
+x = -21.5, hard against the west wall, leaving 0.25 m: the aisle has one
+opening, so "go round" is not optional.
+
+| | before | after |
+|---|---|---|
+| Rack row | 3.6 m bays, 0.9 m gaps | **continuous** |
+| Heavy block | 3 rows | **2 rows** |
+| `heavy_storage` | (-17.5, -10.7) | **(-15.0, -10.7)** |
+| Ways into the heavy aisle | ~10 unusable gaps | **1 mouth, 2.4 m wide** |
+
+Three tests hold it: no row may contain a gap between 0 and 1.9 m; the goal must
+lie between exactly two rows in a drivable aisle; and the west end must be too
+tight to squeeze through. All three fail on the old geometry.
+
+---
+
+## 8j. The map is generated, not drawn
+
+`scripts/render_layout_map.py` renders `maps/warehouse_layout.png` from
+`build_warehouse()` -- the same function that emits the SDF, the elevation map
+and the waypoint file. There is no second source for it to disagree with: if the
+picture is wrong, the world is wrong.
+
+That matters more than the convenience. Every layout bug in this project so far
+-- overlapping ramps, obstacles routed onto slopes, a pedestrian parked on a
+dock, racks with untraversable gaps -- was invisible in a coordinate list and
+obvious the moment it was drawn. A rendered plan is not documentation of the
+world; it is a check on it.
+
+---
+
+## 8k. The aisle was wide enough and still unusable
+
+Making the rack rows continuous fixed robots wedging *between* racks. It did
+not fix robots crabbing along the shelving instead of driving down the aisle,
+because that had a different cause and the geometry checks could not see it.
+
+The aisle was 2.40 m. The heavy mapper is 1.10 m wide. It fits, with 0.65 m to
+spare on each side, and every clearance test said so.
+
+But **nav2 inflates 0.75 m out from every obstacle face**. Two facing rack rows
+therefore leave a cost-free band of
+
+```
+2 * (1.20 - 0.75) = 0.90 m
+```
+
+for a robot that is 1.10 m wide. There is no pose anywhere in that aisle where
+the robot is not paying inflation cost, so the planner has no reason to prefer
+the centreline over scraping a rack, and the local controller wanders looking
+for something cheaper that does not exist.
+
+Rows are now 5.0 m apart — a 4.0 m aisle, a **2.50 m** cost-free lane — and
+there are fewer of them, because an aisle a robot cannot use is not storage
+capacity, it is decoration.
+
+| | before | after |
+|---|---|---|
+| Row spacing | 3.4 m | **5.0 m** |
+| Aisle | 2.40 m | **4.00 m** |
+| Cost-free lane | 0.90 m | **2.50 m** |
+| Rows (general block) | 3 | **2** |
+
+**The transferable lesson.** *Geometric fit is not the test.* Every check in
+this project asked "does the robot fit", which is a question about the world.
+The question that decides whether it drives is "does the planner have a
+zero-cost pose", which is a question about the world **and the costmap
+configuration together**. `test_aisles_have_a_cost_free_lane_for_the_widest_robot`
+now asks the second one, with `inflation_radius` written into it.
+
+---
+
+## 8l. Two slopes 0.28 m apart
+
+AMR-2 could climb the mezzanine ramp and then fail to come back down. The cause
+is visible once the numbers are laid side by side: the Hump Bridge's east ramp
+ends at **x = 5.22**, and the mezzanine's gentle ramp began at **x = 5.50**.
+
+0.28 m. Two slopes falling in different directions with a gap narrower than a
+wheel between them. A robot descending one has nowhere level to stand before it
+must commit to the next, and the local costmap around that seam is entirely
+inflation.
+
+The deck was also 1.15 m short of the north wall, and that shortfall was what
+pushed its ramps south into the Hump Bridge's approaches in the first place —
+every metre the deck is short of the wall costs its ramp feet the same metre.
+So the deck is now backed hard onto the wall at y = 14.75, and the gentle
+ramp's centreline moved east.
+
+| | before | after |
+|---|---|---|
+| Mezzanine deck | y[7.5, 13.6] | **y[8.65, 14.75]**, on the wall |
+| Hump east ramp → gentle ramp | 0.28 m | **1.28 m** |
+| Gentle ramp → steep ramp | 0.80 m | **1.30 m** |
+
+That last row is the interesting one. I moved the deck and the gentle ramp to
+fix the gap I had been shown, wrote
+`test_no_two_ramps_run_close_enough_to_trap_a_robot` to stop it recurring — and
+the test immediately failed on a **second** near-miss, between the mezzanine's
+own two ramps, which nobody had noticed and which I had just walked straight
+past while editing the same twenty lines.
+
+**The transferable lesson.** A rule stated once and checked everywhere finds the
+instances you were not looking at. I had been fixing the reported pair; the
+invariant found the pair nobody reported. That is the entire argument for
+turning a fix into a property.
+
+---
+
 ## 9. What I would do next
 
 Honest gaps, roughly in the order I would close them.
 
-1. **Integration tests under `launch_testing`.** The 254 automated tests cover the
+1. **Integration tests under `launch_testing`.** The 268 automated tests cover the
    algorithms thoroughly and the node wiring not at all. A `launch_testing`
    suite that brings up two robots headless and asserts on `/cmd_vel` and
    `/fleet/traffic_directives` would cover the seam between them.

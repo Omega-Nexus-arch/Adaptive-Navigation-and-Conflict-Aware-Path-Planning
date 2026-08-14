@@ -16,11 +16,11 @@ waypoints:
     level: "ground"
     description: "AMR-2 charging dock / start pose"
   heavy_storage:
-    x: -17.5
-    y: -10.7
+    x: -15.0
+    y: -11.5
     yaw: 3.141593
     level: "ground"
-    description: "AMR-1 primary goal: deep aisle in the heavy rack block"
+    description: "AMR-1 primary goal: mid-aisle between the two heavy rows"
   packing_bay_4:
     x: 17.2
     y: 2.0
@@ -28,8 +28,8 @@ waypoints:
     level: "ground"
     description: "AMR-2 primary goal: east-wall packing bay"
   mezzanine_storage:
-    x: 7.0
-    y: 10.5
+    x: 8.0
+    y: 11.7
     yaw: 0.000000
     level: "mezzanine"
     description: "Ramp-only goal: proves ramps are used when unavoidable"

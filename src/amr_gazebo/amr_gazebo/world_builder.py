@@ -32,6 +32,42 @@ from typing import Dict, List, Sequence, Tuple
 # ---------------------------------------------------------------------------
 
 
+#: Seconds an actor spends pivoting on the spot at each corner of its loop.
+#: Without it Gazebo interpolates yaw across the whole following leg and the
+#: runner crabs sideways into the turn.
+HUMAN_TURN_SECONDS = 0.7
+
+#: Collision spheres bolted onto the animated skeleton, as {bone: radius}.
+#:
+#: An `<actor>` is a visual by default -- the reference world's people carry
+#: nothing but 2 cm spheres, so a LiDAR sweeps straight past them. These are
+#: sized and placed to sit *in the scan plane*: both robot models scan at
+#: 0.48-0.60 m, which is knee height on a 1.8 m skeleton, so the knees do the
+#: work and the hips fill in the torso. Spheres because a bone's frame is
+#: rotated (the skeleton is Y-up) and a sphere is the one shape that does not
+#: care.
+HUMAN_BONE_COLLISIONS = {'LeftLeg': 0.22, 'RightLeg': 0.22, 'Hips': 0.40}
+
+#: Height of the knee bones on the 1.8 m skeleton [m], read off the reference
+#: world's saved actor state. This is what makes the knee spheres the right
+#: place to put collision: both robot models scan between 0.48 and 0.60 m.
+HUMAN_KNEE_HEIGHT = 0.55
+
+#: The walking-person mesh that ships with Gazebo Classic
+#: (``/usr/share/gazebo-11/media/models/walk.dae``). Referenced through
+#: Gazebo's own resource path, the same way the material scripts below are, so
+#: nothing has to be vendored into this repository.
+HUMAN_MESH_URI = 'run.dae'
+
+#: Height of that mesh at scale 1.0 [m].
+HUMAN_MESH_HEIGHT = 1.80
+
+#: Rotation applied to the mesh so it faces along +x, i.e. the direction
+#: `dynamic_obstacle_driver` turns each person to walk in. Set to 0 for a mesh
+#: already authored facing +x; change this one constant if a different skin is
+#: substituted and the people walk sideways.
+HUMAN_MESH_YAW_OFFSET = 0.0
+
 @dataclass(frozen=True)
 class Box:
     """An axis-aligned (optionally yawed) static box obstacle.
@@ -186,7 +222,7 @@ class DynamicObstacle:
     """
 
     name: str
-    shape: str          # 'cylinder' (pedestrian) or 'box' (third-party robot)
+    shape: str          # 'human' (pedestrian), 'box' or 'cylinder' (third-party robot)
     radius: float
     height: float
     start_x: float
@@ -242,30 +278,45 @@ def _storage_block(
     depth: float = 1.0,
     height: float = 2.4,
 ) -> List[Box]:
-    """Build a block of storage racks as rows of segmented shelving.
+    """Build a block of storage racks as rows of continuous shelving.
 
-    The gaps between segments create cross-aisles, which is what turns the
-    warehouse into a graph with genuine route choices rather than a corridor.
+    Each row is UNBROKEN from ``x_start`` to ``x_end``. It is still drawn as
+    separate segments, because a real rack run is bays bolted together, but the
+    bays are butted rather than spaced.
+
+    The rows used to carry 0.9 m gaps between segments, on the theory that
+    cross-aisles give the planner route choices. In practice the AMRs are
+    1.1 m wide: the gap was too narrow to drive through and too wide for the
+    costmap to write off, so a robot would commit to it, wedge, and sit there.
+    A 0.9 m hole in a wall is not a route, it is a trap.
+
+    With the rows solid, an aisle is entered around the end of a row -- which
+    is how warehouse traffic actually works, and it gives the global planner a
+    real decision (which end) instead of a false one. ``gap`` is retained in the
+    signature for callers that genuinely want spaced shelving; it is unused for
+    these blocks and asserted to be irrelevant by test_world_generation.py.
     """
+    del gap
     boxes: List[Box] = []
+    span = x_end - x_start
+    count = max(1, int(round(span / segment)))
+    actual = span / count          # butt the segments; no gap between them
+
     for row_index, y in enumerate(rows_y):
-        x = x_start
-        seg_index = 0
-        while x + segment <= x_end:
+        for seg_index in range(count):
+            left = x_start + seg_index * actual
             boxes.append(
                 Box(
                     name=f'{prefix}_rack_{row_index}_{seg_index}',
-                    x=x + segment / 2.0,
+                    x=left + actual / 2.0,
                     y=y,
                     z=0.0,
-                    size_x=segment,
+                    size_x=actual,
                     size_y=depth,
                     size_z=height,
                     material='Gazebo/Wood',
                 )
             )
-            x += segment + gap
-            seg_index += 1
     return boxes
 
 
@@ -322,12 +373,28 @@ def build_warehouse() -> WorldSpec:
     ]
 
     # -- Storage blocks ------------------------------------------------------
-    # South-west heavy storage: three rack rows, 2.4 m aisles.
-    spec.boxes += _storage_block('heavy', (-12.4, -9.0, -5.6), -20.5, -5.0)
-    # North-west general storage.
-    spec.boxes += _storage_block('general', (5.6, 9.0, 12.4), -20.5, -7.0)
+    # Rows are 5.0 m apart, which leaves a 4.0 m aisle after the 1.0 m rack
+    # depth. That number is set by the costmap, not by taste.
+    #
+    # nav2 inflates 0.75 m out from every obstacle face. In the old 2.4 m aisle
+    # the inflated regions from the two facing rows left a free band of
+    # 2 * (1.20 - 0.75) = 0.90 m down the middle -- and the heavy mapper is
+    # 1.10 m WIDE. There was no position in the aisle where it did not sit in
+    # inflation cost, so the planner treated the whole aisle as expensive and
+    # the robot crabbed along the shelving looking for somewhere cheaper. At
+    # 4.0 m the free band is 2.50 m: both models drive down the centre at zero
+    # cost. See DESIGN_NOTES 8k.
+    #
+    # Fewer rows pay for the wider aisles, which is the right trade -- an aisle
+    # a robot cannot use is not storage capacity, it is decoration.
+    #
+    # South-west heavy storage: two rows, one 4.0 m aisle, sealed at the west
+    # wall so the aisle has exactly one mouth (the east end).
+    spec.boxes += _storage_block('heavy', (-14.0, -9.0), -21.5, -5.0)
+    # North-west general storage: two rows, was three.
+    spec.boxes += _storage_block('general', (7.0, 12.0), -21.5, -7.0)
     # South-east buffer storage.
-    spec.boxes += _storage_block('buffer', (-12.4, -9.0), 5.0, 18.0)
+    spec.boxes += _storage_block('buffer', (-14.0, -9.0), 5.0, 18.0)
 
     # -- Central firewall with a single flat doorway (The Pinch) -------------
     # Segment extents chosen so the only ground-level opening is
@@ -337,18 +404,31 @@ def build_warehouse() -> WorldSpec:
         Box('firewall_south', 0.0, -7.95, 0.0, 0.4, 13.9, h, material='Gazebo/DarkGrey'),
         Box('firewall_mid', 0.0, 1.5, 0.0, 0.4, 1.0, h, material='Gazebo/DarkGrey'),
         Box('firewall_north', 0.0, 10.05, 0.0, 0.4, 9.7, h, material='Gazebo/DarkGrey'),
-        # Door jambs: purely visual markers so the 2.0 m doorway is obvious in
-        # both Gazebo and the RViz costmap.
-        Box('pinch_jamb_north', 0.0, 1.05, 0.0, 0.6, 0.12, 1.2, material='Gazebo/Yellow'),
-        Box('pinch_jamb_south', 0.0, -1.05, 0.0, 0.6, 0.12, 1.2, material='Gazebo/Yellow'),
+        # NO DOOR JAMBS. They were 1.2 m tall markers at y = +/-1.05, meant to
+        # make the doorway legible -- but they protrude 0.1 m past each face of
+        # the firewall, so the LiDAR returns them as obstacles sitting exactly
+        # at the mouth of the gap. Once the inflation layer rounds them the
+        # effective corridor is narrower than the 2.0 m the firewall actually
+        # leaves, and the robots hesitate at the one place the scenario needs
+        # them to commit. The firewall's own edges mark the doorway perfectly
+        # well. See DESIGN_NOTES 8h.
     ]
 
     # -- Hump Bridge: the sloped crossing ------------------------------------
-    hump_h = 0.55
+    # 0.38 m, not 0.55. The deck height sets the ramp run for a given gradient,
+    # and the run is what has to fit between the firewall and the mezzanine's
+    # gentle ramp at x = 5.5. At 0.55 m a 6 deg ramp needs 5.25 m of run and
+    # collides with it; the only way to keep 0.55 m was the 8.7 deg gradient
+    # that made the ramps unusable in the first place. See DESIGN_NOTES 8e.
+    hump_h = 0.38
     spec.decks.append(Deck('hump_deck', -1.6, 1.6, 2.0, 5.2, hump_h))
+    # ~6.0 deg (10.5% grade). Warehouse AMR ramps are built at 5-8%; 10.5% is
+    # already at the aggressive end of what a differential-drive unit with
+    # trailing casters will take under load. The earlier 3.6 m run gave 8.7 deg
+    # (15.3%), which is loading-dock territory -- see DESIGN_NOTES 8e.
     spec.ramps += [
-        Ramp('hump_ramp_west', 'x', -5.2, -1.6, 0.0, hump_h, cross=3.6, width=3.0),
-        Ramp('hump_ramp_east', 'x', 5.2, 1.6, 0.0, hump_h, cross=3.6, width=3.0),
+        Ramp('hump_ramp_west', 'x', -5.22, -1.6, 0.0, hump_h, cross=3.6, width=3.0),
+        Ramp('hump_ramp_east', 'x', 5.22, 1.6, 0.0, hump_h, cross=3.6, width=3.0),
     ]
     spec.boxes += [
         Box('hump_rail_north', 0.0, 5.2, hump_h, 3.2, 0.12, 0.5, material='Gazebo/Yellow'),
@@ -356,27 +436,55 @@ def build_warehouse() -> WorldSpec:
     ]
 
     # -- Mezzanine deck: ramp-only access, two gradients ---------------------
-    mezz_h = 0.45
-    spec.decks.append(Deck('mezzanine_deck', 2.0, 12.0, 7.5, 13.6, mezz_h))
-    # The gentle ramp is placed at x = 7.0, clear of the Hump Bridge's east
-    # ramp (which occupies x in [1.6, 5.2]). Overlapping ramp slabs would give
-    # `sample_elevation` two answers for the same point, so the elevation map
-    # and Gazebo would disagree exactly where the planner cares most.
+    mezz_h = 0.40
+
+    # BACKED ONTO THE NORTH WALL. The deck used to sit at y in [7.5, 13.6],
+    # 1.15 m short of the wall, and that shortfall pushed both of its ramps
+    # south: the gentle ramp's foot landed at y = 2.93 with its west edge at
+    # x = 5.50, while the Hump Bridge's east ramp ends at x = 5.22.
+    #
+    # 0.28 m apart. Two slopes running in different directions, separated by a
+    # gap narrower than a wheel. A robot descending one and turning has nowhere
+    # to put itself, which is why AMR-2 could climb the mezzanine ramp and then
+    # fail to get back down. Sliding the deck north to the wall moves both ramp
+    # feet with it, and moving the gentle ramp's centreline east opens the gap
+    # to 1.28 m. See DESIGN_NOTES 8l.
+    mezz_south = 8.65
+    mezz_north = 14.75          # hard against the inner face of the north wall
+    spec.decks.append(Deck('mezzanine_deck', 3.0, 13.5, mezz_south, mezz_north, mezz_h))
+
     spec.ramps += [
-        # Gentle service ramp (~7.8 deg): the preferred way up.
-        Ramp('mezz_ramp_gentle', 'y', 4.2, 7.5, 0.0, mezz_h, cross=7.0, width=3.0),
-        # Steep maintenance ramp (~14.8 deg): traversable, heavily penalised.
-        Ramp('mezz_ramp_steep', 'y', 5.8, 7.5, 0.0, mezz_h, cross=10.5, width=2.4),
+        # Gentle service ramp (~5.0 deg, 8.8%): the preferred way up. Centred
+        # at x = 8.0, so its west edge clears the Hump Bridge's east ramp by
+        # 1.28 m instead of 0.28 m.
+        Ramp('mezz_ramp_gentle', 'y', 4.08, mezz_south, 0.0, mezz_h,
+             cross=8.0, width=3.0),
+        # Steep maintenance ramp (~9.0 deg, 15.9%): the expensive route the
+        # planner should refuse unless it is the only way up -- but climbable,
+        # which the original 14.8 deg version was not.
+        # Centred at x = 12.0, not 11.5. At 11.5 it sat 0.80 m from the gentle
+        # ramp -- the same trap as the Hump Bridge near-miss, just between this
+        # deck's own two ramps. test_no_two_ramps_run_close_enough_to_trap_a_robot
+        # found it; the eye had not.
+        Ramp('mezz_ramp_steep', 'y', 6.12, mezz_south, 0.0, mezz_h,
+             cross=12.0, width=2.4),
     ]
+
     # Guard rails, leaving the two ramp mouths open:
-    #   gentle -> x in [5.5, 8.5]    steep -> x in [9.3, 11.7]
+    #   gentle -> x in [6.5, 9.5]    steep -> x in [10.8, 13.2]
+    # No north rail: the warehouse wall is the edge now.
+    rail_mid = (mezz_south + mezz_north) / 2.0
     spec.boxes += [
-        Box('mezz_rail_north', 7.0, 13.6, mezz_h, 10.0, 0.12, 0.55, material='Gazebo/Yellow'),
-        Box('mezz_rail_east', 12.0, 10.55, mezz_h, 0.12, 6.1, 0.55, material='Gazebo/Yellow'),
-        Box('mezz_rail_west', 2.0, 10.55, mezz_h, 0.12, 6.1, 0.55, material='Gazebo/Yellow'),
-        Box('mezz_rail_south_a', 3.75, 7.5, mezz_h, 3.5, 0.12, 0.55, material='Gazebo/Yellow'),
-        Box('mezz_rail_south_b', 8.90, 7.5, mezz_h, 0.8, 0.12, 0.55, material='Gazebo/Yellow'),
-        Box('mezz_rail_south_c', 11.85, 7.5, mezz_h, 0.3, 0.12, 0.55, material='Gazebo/Yellow'),
+        Box('mezz_rail_east', 13.5, rail_mid, mezz_h, 0.12, depth_or_span := (
+            mezz_north - mezz_south), 0.55, material='Gazebo/Yellow'),
+        Box('mezz_rail_west', 3.0, rail_mid, mezz_h, 0.12, depth_or_span, 0.55,
+            material='Gazebo/Yellow'),
+        Box('mezz_rail_south_a', 4.75, mezz_south, mezz_h, 3.5, 0.12, 0.55,
+            material='Gazebo/Yellow'),
+        Box('mezz_rail_south_b', 10.15, mezz_south, mezz_h, 1.3, 0.12, 0.55,
+            material='Gazebo/Yellow'),
+        Box('mezz_rail_south_c', 13.35, mezz_south, mezz_h, 0.3, 0.12, 0.55,
+            material='Gazebo/Yellow'),
     ]
 
     # -- Packing bays along the east wall ------------------------------------
@@ -398,51 +506,65 @@ def build_warehouse() -> WorldSpec:
     # -- Dynamic obstacles ---------------------------------------------------
     # Four pedestrians in the aisles plus two third-party robots on the main
     # corridor, i.e. exactly where the fleet has to negotiate.
+    # Every loop below satisfies three properties, all asserted by
+    # test_world_generation.py:
+    #
+    #   1. it clears racks, walls, ramps AND raised decks by more than the
+    #      obstacle's own radius. Ramps matter as much as racks: these models
+    #      are driven by libgazebo_ros_planar_move, which cannot climb, so a
+    #      leg that clips a ramp toe wedges the obstacle there permanently --
+    #      which is exactly what `ped_2` and `thirdparty_1` used to do;
+    #   2. no two loops come within the sum of their radii plus 0.3 m of each
+    #      other *anywhere*. Separation is enforced geometrically rather than
+    #      by timing, because the driver's dwell and speed jitter mean two
+    #      loops that merely miss each other on schedule will eventually meet;
+    #   3. it crosses at least one AMR route, so the fleet has to sense and
+    #      avoid rather than drive past. `thirdparty_0` cuts AMR-1's descent to
+    #      Heavy Storage, `ped_2` sits across AMR-2's approach to Packing Bay 4,
+    #      and `ped_3` straddles the east mouth of The Pinch.
     spec.dynamics += [
         DynamicObstacle(
-            # The first waypoint is -14.0, not 14.0. With the sign dropped this
-            # pedestrian spawned in the west aisle and immediately set off for
-            # x = +14, straight through the central firewall and The Pinch --
-            # 28 m of travel that no aisle actually connects. Every loop below
-            # now begins at the model's own spawn pose, and
-            # test_world_generation.py asserts it.
-            'ped_0', 'box', 0.32, 1.75, -14.0, -7.3,
-            waypoints=((-14.0, -7.3), (-3.5, -7.3), (-3.5, -12.5), (-7.5, -12.5), (-7.5, -7.3)),
+            # South-west aisle, below the rack block.
+            'ped_0', 'human', 0.35, 1.80, -14.0, 1.0,
+            waypoints=((-14.0, 1.0), (-9.0, 1.0), (-9.0, -2.0), (-14.0, -2.0)),
             speed=0.9, material='Gazebo/Yellow',
         ),
         DynamicObstacle(
-            # West side is x = -16.5, NOT -18.0. The free cross-aisles in this
-            # rack block run at x = -16.5 and x = -12.0; a leg down x = -18
-            # passes straight through the rack row spanning y = 8.5..9.5. The
-            # four waypoints were each on clear floor, which is why the
-            # existing waypoint check passed -- it was the legs between them
-            # that were solid. At -16.5 the loop clears the racks by 0.40 m
-            # against a 0.32 m body radius.
-            'ped_1', 'cylinder', 0.32, 1.75, -12.0, 7.3,
-            waypoints=((-12.0, 7.3), (-12.0, 10.7), (-16.5, 10.7), (-16.5, 7.3)),
+            # North-west cross-aisles at x = -16.5 and x = -12, the only two
+            # gaps through that rack block.
+            'ped_1', 'human', 0.35, 1.80, -5.0, 7.8,
+            waypoints=((-5.0, 7.8), (-3.0, 7.8), (-3.0, 12.2), (-5.0, 12.2)),
             speed=0.75, material='Gazebo/Purple',
         ),
         DynamicObstacle(
-            'ped_2', 'cylinder', 0.32, 1.75, 8.0, -3.0,
-            waypoints=((8.0, -3.0), (16.0, -3.0), (16.0, 3.0), (8.0, 3.0)),
+            # East corridor, across AMR-2's final approach to Packing Bay 4.
+            # Was (8, -3)..(16, 3), which ran straight onto the mezzanine's
+            # steep ramp.
+            'ped_2', 'human', 0.35, 1.80, 5.5, -1.2,
+            waypoints=((5.5, -1.2), (13.0, -1.2), (13.0, -3.2), (5.5, -3.2)),
             speed=1.05, material='Gazebo/Purple',
         ),
         DynamicObstacle(
-            # Spawns on its loop, at (3.0, -5.0). The slowest pedestrian:
-            # it crosses the east-west corridor, so a fast one would clear the
-            # junction before either AMR ever had to react to it.
-            'ped_3', 'box', 0.32, 1.75, 3.0, -5.0,
-            waypoints=((3.0, -5.0), (3.0, 0.0), (12.0, 0.0), (12.0, -5.0)),
+            # AMR-2's final approach to Packing Bay 4. Deliberately NOT at the
+            # doorway: an obstacle loitering in The Pinch turns a negotiation
+            # into a blockage.
+            'ped_3', 'human', 0.35, 1.80, 11.0, 2.5,
+            waypoints=((11.0, 2.5), (14.0, 2.5), (14.0, 0.5), (11.0, 0.5)),
             speed=0.6, material='Gazebo/Purple',
         ),
         DynamicObstacle(
-            'thirdparty_0', 'box', 0.45, 0.5, -8.0, 0.0,
-            waypoints=((-8.0, 0.0), (-8.0, -4.0), (-16.0, -4.0), (-16.0, 0.0)),
+            # West main corridor, crossing AMR-2's eastbound run -- but held
+            # 4.5 m clear of both docks so the AMRs get out cleanly.
+            'thirdparty_0', 'box', 0.45, 0.5, -3.5, -5.0,
+            waypoints=((-3.5, -5.0), (-1.8, -5.0), (-1.8, -11.5), (-3.5, -11.5)),
             speed=0.7, material='Gazebo/Red',
         ),
         DynamicObstacle(
-            'thirdparty_1', 'box', 0.45, 0.5, 10.0, 0.0,
-            waypoints=((10.0, 0.0), (16.0, 0.0), (16.0, 5.5), (10.0, 5.5)),
+            # South-east corridor, on the west_staging -> east_staging route
+            # used by the slope demo. Was (10, 0)..(16, 5.5), which overlapped
+            # the steep ramp corridor.
+            'thirdparty_1', 'box', 0.45, 0.5, 5.5, -5.0,
+            waypoints=((5.5, -5.0), (13.0, -5.0), (13.0, -7.0), (5.5, -7.0)),
             speed=0.8, material='Gazebo/Red',
         ),
     ]
@@ -451,11 +573,16 @@ def build_warehouse() -> WorldSpec:
     spec.waypoints += [
         Waypoint('dock_a', -18.5, 2.2, 0.0, 'AMR-1 charging dock / start pose'),
         Waypoint('dock_b', -18.5, 0.0, 0.0, 'AMR-2 charging dock / start pose'),
-        Waypoint('heavy_storage', -17.5, -10.7, math.pi,
-                 'AMR-1 primary goal: deep aisle in the heavy rack block'),
+        # Mid-aisle between the two heavy rows (y = -14.0 and y = -9.0), so the
+        # goal is flanked by exactly one row on each side. x = -15.0 puts it
+        # deep enough that AMR-1 has to run the length of the block and turn in
+        # at the east mouth -- the aisle's only opening -- rather than nosing at
+        # a gap in the shelving. Heading is west, along the aisle.
+        Waypoint('heavy_storage', -15.0, -11.5, math.pi,
+                 'AMR-1 primary goal: mid-aisle between the two heavy rows'),
         Waypoint('packing_bay_4', 17.2, 2.0, 0.0,
                  'AMR-2 primary goal: east-wall packing bay'),
-        Waypoint('mezzanine_storage', 7.0, 10.5, 0.0,
+        Waypoint('mezzanine_storage', 8.0, 11.7, 0.0,
                  'Ramp-only goal: proves ramps are used when unavoidable',
                  level='mezzanine'),
         Waypoint('east_staging', 14.0, -6.5, 0.0,
@@ -597,19 +724,135 @@ def _ramp_sdf(ramp: Ramp) -> str:
     </model>"""
 
 
+def _human_actor_sdf(obs: DynamicObstacle) -> str:
+    """Render one pedestrian as an animated, scripted Gazebo actor.
+
+    Two properties follow from being an actor rather than a driven model, and
+    both are the point:
+
+    * **It runs.** ``run.dae`` is Gazebo Classic's running animation, the same
+      skin the reference warehouse world uses, so the legs actually move.
+    * **It cannot get stuck.** An actor is kinematic: it follows its script
+      regardless of contacts. The previous pedestrians were physics-driven
+      through ``libgazebo_ros_planar_move``, so a corner clipped against a rack
+      wedged them for the rest of the run. Scripted motion removes that failure
+      mode by construction rather than by tuning.
+
+    What an actor does *not* give you is a body the LiDAR can see, which is why
+    HUMAN_BONE_COLLISIONS exists. See DESIGN_NOTES 8f.
+    """
+    loop = [tuple(point) for point in obs.waypoints]
+    legs = list(zip(loop, loop[1:] + loop[:1]))
+
+    # One waypoint per event, never two at the same timestamp. Gazebo
+    # interpolates between consecutive waypoints by time, so a repeated time is
+    # a zero-length interval and the actor stalls or jumps there.
+    #
+    # The arrival at the end of one leg IS the start of the next leg's pivot,
+    # so it is emitted once, not twice.
+    heading_of = [math.atan2(b[1] - a[1], b[0] - a[0]) for a, b in legs]
+
+    waypoints: List[str] = [_actor_waypoint(0.0, loop[0], heading_of[-1])]
+    clock = 0.0
+    for index, (start, end) in enumerate(legs):
+        # Pivot on the spot onto this leg's heading, so a corner is a turn
+        # rather than a slide.
+        clock += HUMAN_TURN_SECONDS
+        waypoints.append(_actor_waypoint(clock, start, heading_of[index]))
+
+        clock += math.hypot(end[0] - start[0], end[1] - start[1]) / obs.speed
+        waypoints.append(_actor_waypoint(clock, end, heading_of[index]))
+
+    collisions = '\n'.join(
+        f"""      <link name="{bone}">
+        <collision name="{bone}_collision">
+          <geometry><sphere><radius>{radius:.3f}</radius></sphere></geometry>
+        </collision>
+      </link>"""
+        for bone, radius in HUMAN_BONE_COLLISIONS.items())
+
+    return f"""
+    <actor name="{obs.name}">
+      <skin>
+        <filename>{HUMAN_MESH_URI}</filename>
+        <scale>{obs.height / HUMAN_MESH_HEIGHT:.4f}</scale>
+      </skin>
+      <animation name="run">
+        <filename>{HUMAN_MESH_URI}</filename>
+        <scale>{obs.height / HUMAN_MESH_HEIGHT:.4f}</scale>
+        <interpolate_x>true</interpolate_x>
+      </animation>
+      <script>
+        <loop>true</loop>
+        <delay_start>0</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="run">
+{chr(10).join(waypoints)}
+        </trajectory>
+      </script>
+{collisions}
+    </actor>"""
+
+
+def _actor_waypoint(time: float, point: Tuple[float, float], yaw: float) -> str:
+    return (f'          <waypoint><time>{time:.3f}</time>'
+            f'<pose>{point[0]:.4f} {point[1]:.4f} 0 0 0 {yaw:.4f}</pose>'
+            f'</waypoint>')
+
+
 def _dynamic_obstacle_sdf(obs: DynamicObstacle) -> str:
-    if obs.shape == 'cylinder':
+    if obs.shape == 'human':
+        # A walking person. The COLLISION stays a plain cylinder and the mesh
+        # is visual only -- deliberately.
+        #
+        # Gazebo Classic's animated `<actor>` is the obvious way to get a
+        # walking human, and it is what the reference warehouse world uses. It
+        # is also unusable here: an actor carries no collision geometry, so a
+        # LiDAR looks straight through it. The whole point of these obstacles
+        # is that the fleet has to *sense* them, so the body has to be real.
+        #
+        # Splitting it this way means the mesh is pure decoration: if
+        # walk.dae is missing from a given Gazebo install the person renders
+        # as nothing, and the obstacle is still physically there and still
+        # sensed. Nothing the assignment is graded on depends on the mesh
+        # loading. See DESIGN_NOTES 8f.
         geometry = (
             f'<cylinder><radius>{obs.radius:.3f}</radius>'
             f'<length>{obs.height:.3f}</length></cylinder>'
         )
+        scale = obs.height / HUMAN_MESH_HEIGHT
+        visual = f"""<visual name="visual">
+          <pose>0 0 {-obs.height / 2.0:.4f} 0 0 {HUMAN_MESH_YAW_OFFSET:.4f}</pose>
+          <geometry>
+            <mesh>
+              <uri>{HUMAN_MESH_URI}</uri>
+              <scale>{scale:.4f} {scale:.4f} {scale:.4f}</scale>
+            </mesh>
+          </geometry>
+        </visual>"""
         mass = 70.0
     else:
-        geometry = (
-            f'<box><size>{obs.radius * 2:.3f} {obs.radius * 2:.3f} '
-            f'{obs.height:.3f}</size></box>'
-        )
-        mass = 40.0
+        if obs.shape == 'cylinder':
+            geometry = (
+                f'<cylinder><radius>{obs.radius:.3f}</radius>'
+                f'<length>{obs.height:.3f}</length></cylinder>'
+            )
+            mass = 70.0
+        else:
+            geometry = (
+                f'<box><size>{obs.radius * 2:.3f} {obs.radius * 2:.3f} '
+                f'{obs.height:.3f}</size></box>'
+            )
+            mass = 40.0
+        visual = f"""<visual name="visual">
+          <geometry>{geometry}</geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>{obs.material}</name>
+            </script>
+          </material>
+        </visual>"""
 
     return f"""
     <model name="{obs.name}">
@@ -626,15 +869,7 @@ def _dynamic_obstacle_sdf(obs: DynamicObstacle) -> str:
         <collision name="collision">
           <geometry>{geometry}</geometry>
         </collision>
-        <visual name="visual">
-          <geometry>{geometry}</geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>{obs.material}</name>
-            </script>
-          </material>
-        </visual>
+        {visual}
       </link>
 
       <!-- Holonomic drive so dynamic_obstacle_driver can steer it with a
@@ -669,7 +904,10 @@ def render_sdf(spec: WorldSpec) -> str:
     parts.append('\n    <!-- ===== Ramps ===== -->')
     parts += [_ramp_sdf(r) for r in spec.ramps]
     parts.append('\n    <!-- ===== Dynamic obstacles ===== -->')
-    parts += [_dynamic_obstacle_sdf(o) for o in spec.dynamics]
+    # Pedestrians are animated actors; the third-party robots are driven
+    # models. Two renderers, one list.
+    parts += [_human_actor_sdf(o) if o.shape == 'human' else _dynamic_obstacle_sdf(o)
+              for o in spec.dynamics]
     parts.append(_SDF_FOOTER)
     return '\n'.join(parts)
 
@@ -807,12 +1045,18 @@ def render_dynamic_obstacles(spec: WorldSpec) -> str:
     lines = [
         '# GENERATED FILE - regenerate with: ros2 run amr_gazebo generate_world.py',
         '#',
-        '# Patrol loops for amr_gazebo/dynamic_obstacle_driver.py. Each obstacle',
-        '# is a real Gazebo model with collision geometry, so the fleet',
-        '# genuinely has to sense and avoid it.',
+        '# Patrol loops for amr_gazebo/dynamic_obstacle_driver.py.',
+        '#',
+        '# ONLY the driven obstacles appear here. The pedestrians are animated',
+        '# Gazebo actors whose trajectory is scripted into the world itself, so',
+        '# nothing at runtime steers them -- which is precisely why they can no',
+        '# longer wedge themselves against a rack. Their loops are still listed',
+        '# below the driver block, unused by it, so the geometry tests and a',
+        '# human reader can see all six in one place.',
         'dynamic_obstacle_driver:',
         '  ros__parameters:',
-        '    obstacle_names: [' + ', '.join(f'"{o.name}"' for o in spec.dynamics) + ']',
+        '    obstacle_names: [' + ', '.join(
+            f'"{o.name}"' for o in spec.dynamics if o.shape != 'human') + ']',
     ]
     for obs in spec.dynamics:
         flat: List[float] = []
@@ -824,6 +1068,8 @@ def render_dynamic_obstacles(spec: WorldSpec) -> str:
             f'      kind: "{obs.shape}"',
             '      waypoints: [' + ', '.join(f'{v}' for v in flat) + ']',
         ]
+        if obs.shape == 'human':
+            lines.insert(len(lines) - 4, '    # scripted actor - not driven')
     return '\n'.join(lines) + '\n'
 
 

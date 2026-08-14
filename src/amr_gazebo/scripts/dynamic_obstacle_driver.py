@@ -96,7 +96,7 @@ class ObstacleAgent:
         if now < self.dwell_until:
             return cmd
 
-        x, y, _yaw = self.pose
+        x, y, yaw = self.pose
         target_x, target_y = self.waypoints[self.index]
         dx, dy = target_x - x, target_y - y
         distance = math.hypot(dx, dy)
@@ -113,10 +113,22 @@ class ObstacleAgent:
         # through its waypoint at full speed.
         speed = min(self.speed, self.speed * max(0.25, distance / 0.5))
         # planar_move interprets linear.x/linear.y in the world frame for a
-        # holonomic body, which is what we want: obstacles need not face the
-        # direction they travel.
+        # holonomic body, so translation is independent of which way the model
+        # is pointing.
         cmd.linear.x = speed * dx / distance
         cmd.linear.y = speed * dy / distance
+
+        # Turn to face the direction of travel. Irrelevant to the physics --
+        # the body is a cylinder and the motion is holonomic -- but a walking
+        # person sliding along sideways looks wrong, and this is the only thing
+        # that makes the human mesh read as walking rather than gliding. A
+        # proportional term on the heading error, wrapped to (-pi, pi] so the
+        # person turns the short way round.
+        heading_error = math.atan2(math.sin(math.atan2(dy, dx) - yaw),
+                                   math.cos(math.atan2(dy, dx) - yaw))
+        cmd.angular.z = max(-self.params['max_turn_rate'],
+                            min(self.params['max_turn_rate'],
+                                self.params['turn_gain'] * heading_error))
         return cmd
 
 
@@ -135,6 +147,10 @@ class DynamicObstacleDriver(Node):
         self.declare_parameter('dwell_min_seconds', 1.5)
         self.declare_parameter('dwell_max_seconds', 4.0)
         self.declare_parameter('skip_probability', 0.10)
+        # Heading control. Purely cosmetic -- motion is holonomic -- but it is
+        # what makes the human mesh face where it is walking.
+        self.declare_parameter('turn_gain', 2.0)
+        self.declare_parameter('max_turn_rate', 2.5)
         self.declare_parameter('enabled', True)
 
         names = [n for n in self.get_parameter('obstacle_names').value if n]
@@ -148,6 +164,8 @@ class DynamicObstacleDriver(Node):
                 self.get_parameter('dwell_max_seconds').value,
             ),
             'skip_probability': self.get_parameter('skip_probability').value,
+            'turn_gain': self.get_parameter('turn_gain').value,
+            'max_turn_rate': self.get_parameter('max_turn_rate').value,
         }
 
         self.agents = {}

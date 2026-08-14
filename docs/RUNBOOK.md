@@ -52,7 +52,7 @@ colcon test --event-handlers console_direct+
 colcon test-result --verbose
 ```
 
-**Check:** 254 tests, 0 failures. This alone validates the motion smoother, the
+**Check:** 268 tests, 0 failures. This alone validates the motion smoother, the
 safety envelope, conflict detection, the yielding protocol, the sensor
 validators, selective mapping, map fusion, the slope cost model, the world
 geometry and every config loader.
@@ -99,6 +99,19 @@ colcon build --packages-select amr_gazebo && source install/setup.bash
 ```
 
 **Check:** prints 4 ramps with their gradients and the paths it wrote.
+
+---
+
+## Step 4b · Render the layout map
+
+```bash
+ros2 run amr_gazebo render_layout_map.py
+```
+
+Writes `amr_gazebo/maps/warehouse_layout.png`: racks, ramps with their
+gradients, raised decks, all nine named goals with coordinates, and the six
+patrol loops. Generated from the same `build_warehouse()` the SDF comes from, so
+it cannot drift from what Gazebo loads.
 
 ---
 
@@ -361,6 +374,11 @@ milliseconds.
 | `Starting point in lethal space!` | `ros2 topic echo /amr1/scan --once \| head -20` | If the ranges are all ~0.3 m the scanner is inside its own chassis and SLAM is mapping the robot. `lidar.height` must clear `base_z_offset + chassis_height + 0.024`. See DESIGN_NOTES 8d. |
 | `map geometry changed to 19x13` (a tiny map) | `ros2 run amr_bringup check_model_consistency.py` | Same cause. Compare the map's metres against the chassis dimensions -- if they match, the LiDAR is seeing the robot. |
 | `minimum laser range setting (0.0 m) exceeds...` | - | The key is `min_laser_range`, not `minimum_laser_range`. Fixed, and now derived per robot from `robot_models.yaml`. |
+| Obstacle wedged on a ramp | `ros2 run amr_gazebo generate_world.py` then rebuild | The patrol loops are generated; a leg that clips a ramp toe traps a `planar_move` body. `test_no_patrol_leg_passes_through_a_static_body` covers ramps and decks, not just racks. |
+| Two obstacles locked together | - | Loops are required to be spatially disjoint by the sum of their radii plus 0.3 m; see `test_no_two_patrol_loops_can_ever_meet`. |
+| Pedestrians render as nothing | `ls /usr/share/gazebo-11/media/models/run.dae` | The running skin ships with Gazebo. If it is absent, install `gazebo11-common`. |
+| Pedestrians visible but never sensed | `ros2 topic echo /amr1/scan --once` while one crosses in front | Actor bone collisions must be present. Confirm the world has `<collision` inside each `<actor>`; regenerate if not. |
+| AMR stalls at the foot of a ramp | `ros2 run amr_bringup check_model_consistency.py` | Confirms the steepest ramp is within every model's `max_traversable_angle_degrees`. Ramps are 5-9 deg; anything above ~10 deg is not climbable by these drivetrains. |
 | `colcon test` fails but gtest/pytest all pass | `colcon test-result --verbose \| grep -E 'gtest\|pytest'` | Only the style linters failed. Run `ament_uncrustify --reformat` in the package. |
 
 ---
