@@ -239,11 +239,34 @@ global_costmap:
         elevation_map: ""
         free_angle_degrees: 2.0
         max_traversable_angle_degrees: 16.0
-        base_cost: 40
-        max_cost: 253
-        # > 1 keeps a gentle service ramp cheap while making a steep
-        # maintenance ramp a genuine last resort.
-        curve_exponent: 2.0
+        # A RAMP IS A LAST RESORT, NOT A SHORTCUT.
+        #
+        # These three numbers together decide how much flat detour the planner
+        # will accept before it agrees to climb. Smac prices a cell as
+        #
+        #     effective length = cell * (1 + cost_travel_multiplier * cost/252)
+        #
+        # so at cost_travel_multiplier 3.0 a cell at cost 214 is 3.5x as long
+        # as a flat one. The hump crossing is ~7.2 m of slope, which therefore
+        # costs about 18 m of extra effective distance - far more than any
+        # flat way round in this warehouse, and the ramps stop being shortcuts.
+        #
+        # base_cost 200: even a barely-tilted cell is expensive. The gradient
+        # of the ramp is nearly irrelevant to the routing decision; the fact
+        # that it IS a ramp is what matters.
+        base_cost: 200
+        # 252, NOT 253. 253 is INSCRIBED_INFLATED_OBSTACLE, and
+        # nav2_smac_planner's Node2D::isNodeValid REFUSES any cell at or above
+        # it. A ramp priced 253 is not "expensive", it is impassable - which
+        # silently breaks the other half of the requirement, that a ramp is
+        # still taken when it is the only way through. The model clamps to
+        # kLethal - 1 = 253, so the ceiling has to be imposed here.
+        max_cost: 252
+        # Linear. With base_cost at 200 the curve barely matters, and an
+        # exponent above 1 is actively wrong now: it made the GENTLE ramps
+        # cheap, and a gentle ramp is exactly the one the planner was
+        # tempted to treat as a shortcut.
+        curve_exponent: 1.0
         unknown_is_free: True
         publish_debug_grid: True
 

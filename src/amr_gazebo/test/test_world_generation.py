@@ -1031,3 +1031,349 @@ def test_waypoint_yaml_covers_the_documented_goals(spec):
     assert set(parsed['waypoints']) == {w.name for w in spec.waypoints}
     for name in ('heavy_storage', 'packing_bay_4', 'mezzanine_storage'):
         assert name in parsed['waypoints']
+
+
+def _slope_costing():
+    """The live SlopeLayer settings, read from nav2_params.yaml."""
+    import re
+    path = os.path.join(SRC, 'amr_bringup', 'config', 'nav2_params.yaml')
+    with open(path, 'r', encoding='utf-8') as handle:
+        text = handle.read()
+
+    def scalar(key):
+        match = re.search(rf'^\s*{key}:\s*([0-9.]+)', text, re.M)
+        assert match, f'{key} missing from nav2_params.yaml'
+        return float(match.group(1))
+
+    return {
+        'free': scalar('free_angle_degrees'),
+        'max_angle': scalar('max_traversable_angle_degrees'),
+        'base': scalar('base_cost'),
+        'top': scalar('max_cost'),
+        'exponent': scalar('curve_exponent'),
+        'travel_multiplier': scalar('cost_travel_multiplier'),
+    }
+
+
+#: nav2 marks this and above as inscribed-lethal, and nav2_smac_planner's
+#: Node2D::isNodeValid REFUSES such a cell outright.
+INSCRIBED_INFLATED_OBSTACLE = 253
+
+#: Cell size for the routing checks below [m].
+#:
+#: Coarser than the 5 cm grid the geometry tests use: a Dijkstra over the whole
+#: 44 x 30 m warehouse at 5 cm is half a million cells and takes seconds, and
+#: these tests run it several times. 15 cm keeps the aisles and the doorway
+#: resolved, and a 15 cm step up the steepest ramp is 24 mm -- still inside
+#: MAX_STEP, so the routes remain legal.
+ROUTE_RESOLUTION = 0.15
+
+
+def _slope_cost_field(spec, settings):
+    """Per-cell slope cost, mirroring amr_navigation/SlopeCostModel."""
+    import numpy as np
+    elevation = _elevation_grid(spec, ROUTE_RESOLUTION)
+    gradient_y, gradient_x = np.gradient(elevation, ROUTE_RESOLUTION)
+    angle = np.degrees(np.arctan(np.hypot(gradient_x, gradient_y)))
+    fraction = np.clip(
+        (angle - settings['free']) / (settings['max_angle'] - settings['free']), 0.0, 1.0)
+    cost = settings['base'] + (settings['top'] - settings['base']) * \
+        fraction ** settings['exponent']
+    cost = np.where(angle <= settings['free'], 0.0, cost)
+    cost = np.where(angle >= settings['max_angle'], 254.0, cost)
+    return elevation, cost
+
+
+def _cheapest_route(spec, occupancy, elevation, cost, settings, start, goal,
+                    extra_blocked=None):
+    """Dijkstra using Smac's own cell pricing.
+
+    nav2_smac_planner charges a cell as
+
+        effective length = cell_size * (1 + cost_travel_multiplier * cost / 252)
+
+    Returns (effective cost, whether any sloped cell was crossed).
+    """
+    import heapq
+    import math
+
+    import numpy as np
+
+    height, width = occupancy.shape
+    source = _to_cell(spec, *start, resolution=ROUTE_RESOLUTION)
+    target = _to_cell(spec, *goal, resolution=ROUTE_RESOLUTION)
+    best = np.full(occupancy.shape, np.inf)
+    best[source] = 0.0
+    queue = [(0.0, source, False)]
+    while queue:
+        spent, (row, col), climbed = heapq.heappop(queue)
+        if spent > best[row, col] + 1e-9:
+            continue
+        if (row, col) == target:
+            return spent, climbed
+        for d_row, d_col in ((1, 0), (-1, 0), (0, 1), (0, -1),
+                             (1, 1), (1, -1), (-1, 1), (-1, -1)):
+            next_row, next_col = row + d_row, col + d_col
+            if not (0 <= next_row < height and 0 <= next_col < width):
+                continue
+            if occupancy[next_row, next_col]:
+                continue
+            if extra_blocked is not None and extra_blocked[next_row, next_col]:
+                continue
+            if cost[next_row, next_col] >= INSCRIBED_INFLATED_OBSTACLE:
+                continue          # Smac will not expand into these at all
+            if abs(elevation[next_row, next_col] - elevation[row, col]) > MAX_STEP:
+                continue
+            step = ROUTE_RESOLUTION * math.hypot(d_row, d_col)
+            spend = spent + step * (
+                1.0 + settings['travel_multiplier'] * cost[next_row, next_col] / 252.0)
+            if spend < best[next_row, next_col]:
+                best[next_row, next_col] = spend
+                heapq.heappush(
+                    queue, (spend, (next_row, next_col),
+                            climbed or cost[next_row, next_col] > 0))
+    return float('inf'), False
+
+
+def test_a_ramp_is_priced_below_the_planners_refusal_threshold(spec):
+    """"Expensive" and "impassable" are one costmap value apart.
+
+    The cost model clamps to ``kLethal - 1`` = 253, which reads like the safe
+    ceiling and is not: 253 is INSCRIBED_INFLATED_OBSTACLE, and Smac's
+    ``Node2D::isNodeValid`` refuses any cell at or above it. A ramp priced 253
+    is not avoided, it is unusable -- and the half of the requirement that says
+    a ramp IS taken when it is the only way through fails silently.
+    """
+    settings = _slope_costing()
+    assert settings['top'] < INSCRIBED_INFLATED_OBSTACLE, (
+        f"max_cost {settings['top']:.0f} is at or above "
+        f'{INSCRIBED_INFLATED_OBSTACLE}, where nav2_smac_planner stops '
+        f'expanding. Every ramp becomes impassable rather than expensive.'
+    )
+
+    # Check the model's own curve at each ramp's gradient, rather than probing
+    # the rasterised field: a cell sampled at a ramp's midpoint may straddle
+    # the join and read a gentler angle than the ramp actually has.
+    for ramp in spec.ramps:
+        fraction = min(1.0, max(0.0, (ramp.slope_deg - settings['free']) /
+                                (settings['max_angle'] - settings['free'])))
+        priced = settings['base'] + (settings['top'] - settings['base']) * \
+            fraction ** settings['exponent']
+        assert priced < INSCRIBED_INFLATED_OBSTACLE, (
+            f'{ramp.name} at {ramp.slope_deg:.1f} deg prices out at '
+            f'{priced:.0f}; the planner would refuse it outright'
+        )
+        assert priced >= settings['base'], 'a sloped cell must cost at least base_cost'
+
+
+def test_the_planner_takes_the_long_way_round_rather_than_a_ramp(spec):
+    """A ramp is a last resort, not a shortcut.
+
+    Both halves are asserted here, because either alone is trivially
+    satisfiable: make ramps free and the first fails, make them lethal and the
+    second does.
+    """
+    settings = _slope_costing()
+    occupancy = _obstacle_grid(spec, ROUTE_RESOLUTION)
+    elevation, cost = _slope_cost_field(spec, settings)
+    named = {w.name: w for w in spec.waypoints}
+    start = (named['dock_a'].x, named['dock_a'].y)
+    goal = (named['east_staging'].x, named['east_staging'].y)
+
+    flat, climbed_flat = _cheapest_route(
+        spec, occupancy, elevation, cost, settings, start, goal)
+    assert not climbed_flat, (
+        'with the firewall doorway open the planner still routed over a ramp. '
+        'Raise base_cost until the slope costs more than the way round.'
+    )
+
+    sealed = _rect_block(spec, occupancy, -0.6, 0.6, -1.1, 1.1,
+                         resolution=ROUTE_RESOLUTION)
+    forced, climbed_forced = _cheapest_route(
+        spec, occupancy, elevation, cost, settings, start, goal,
+        extra_blocked=sealed)
+    assert climbed_forced, (
+        'with the doorway sealed the bridge is the only crossing, but the '
+        'planner did not use it -- the ramps have been priced out of '
+        'existence rather than merely made unattractive'
+    )
+
+    # And the gap between the two is the detour it is willing to pay to stay
+    # flat. Anything less and a slightly shorter route over the bridge wins.
+    margin = forced - flat
+    assert margin >= 12.0, (
+        f'the planner accepts only {margin:.1f} m of extra effective distance '
+        f'before it prefers the ramp. That is inside the spread of ordinary '
+        f'routes in this warehouse, so the bridge would still get used as a '
+        f'shortcut.'
+    )
+
+
+def test_a_goal_that_is_only_reachable_by_ramp_is_still_reachable(spec):
+    """mezzanine_storage sits on the deck. The ramp is the only way up."""
+    settings = _slope_costing()
+    occupancy = _obstacle_grid(spec, ROUTE_RESOLUTION)
+    elevation, cost = _slope_cost_field(spec, settings)
+    named = {w.name: w for w in spec.waypoints}
+
+    spent, climbed = _cheapest_route(
+        spec, occupancy, elevation, cost, settings,
+        (named['dock_a'].x, named['dock_a'].y),
+        (named['mezzanine_storage'].x, named['mezzanine_storage'].y))
+
+    assert spent < float('inf'), (
+        'mezzanine_storage is unreachable. Slope cost has crossed from '
+        '"avoid" into "refuse", which is the failure the 253 ceiling causes.'
+    )
+    assert climbed, 'expected the route to the deck to use its ramp'
+
+
+def test_even_the_gentlest_ramp_is_priced_as_a_last_resort(spec):
+    """The shallowest slope is the one that tempts the planner.
+
+    A steep ramp prices itself out; a 5 degree service ramp is the one that
+    looks like a shortcut. The old curve made exactly that mistake -- with
+    ``base_cost`` 40 and a squared curve the gentlest ramp came out at 49,
+    barely above free space.
+
+    This pins the property rather than any one knob. ``base_cost``,
+    ``curve_exponent`` and ``max_cost`` can be traded against each other freely
+    so long as the cheapest slope in the world stays expensive.
+    """
+    settings = _slope_costing()
+    gentlest = min(spec.ramps, key=lambda r: r.slope_deg)
+    fraction = min(1.0, max(0.0, (gentlest.slope_deg - settings['free']) /
+                            (settings['max_angle'] - settings['free'])))
+    priced = settings['base'] + (settings['top'] - settings['base']) * \
+        fraction ** settings['exponent']
+
+    floor = 190
+    assert priced >= floor, (
+        f'{gentlest.name} is the shallowest ramp in the world at '
+        f'{gentlest.slope_deg:.1f} deg and prices at only {priced:.0f}. Below '
+        f'about {floor} the planner will treat it as a shortcut whenever it '
+        f'saves a few metres. This is the ramp that needs to be expensive, '
+        f'not the steep one.'
+    )
+    assert priced < INSCRIBED_INFLATED_OBSTACLE
+
+
+def _docs_text():
+    """README and the traceability table, which quote the world's dimensions."""
+    root = os.path.dirname(SRC)
+    parts = {}
+    for name in ('README.md', os.path.join('docs', 'REQUIREMENTS.md')):
+        path = os.path.join(root, name)
+        with open(path, 'r', encoding='utf-8') as handle:
+            parts[name] = handle.read()
+    return parts
+
+
+def test_the_documented_dimensions_match_the_generated_world(spec):
+    """Documentation drift is a correctness bug, not a tidiness one.
+
+    Every figure in the README and the traceability table came from the world
+    at the moment it was written. The world is generated, and it has been
+    regenerated many times since -- ramps flattened from 14.8 to 9 degrees,
+    aisles widened from 2.4 to 4.0 m, the doorway from 2.0 to 2.10 m, a
+    pedestrian retired. None of that touched the prose, so the documents went
+    on describing a warehouse that no longer existed.
+
+    A reviewer reading those numbers and then measuring the world would
+    conclude the requirement was unmet. This test makes the prose fail the
+    build instead.
+    """
+    docs = _docs_text()
+
+    gradients = sorted({round(ramp.slope_deg, 1) for ramp in spec.ramps})
+    decks = {deck.name: deck.height for deck in spec.decks}
+    dynamic = len(spec.dynamics)
+
+    expected = []
+    for gradient in gradients:
+        expected.append((f'{gradient:.1f}°', f'ramp gradient {gradient:.1f} deg'))
+    for name, height in decks.items():
+        expected.append((f'{height:.2f} m', f'{name} height'))
+    expected.append((f'{dynamic} collision-bearing', 'dynamic obstacle count'))
+
+    for name, text in docs.items():
+        for token, what in expected:
+            if what == 'dynamic obstacle count' and name == 'README.md':
+                continue          # only the traceability table states the count
+            assert token in text, (
+                f'{name} does not mention {token} ({what}). The world has '
+                f'changed since the prose was written; a reviewer measuring '
+                f'the world would find the documentation wrong.'
+            )
+
+    # And the figures that were wrong must not come back.
+    for name, text in docs.items():
+        for stale in ('8.7°', '14.8°', '7.8°', '2.4 m aisle'):
+            assert stale not in text, (
+                f'{name} still quotes {stale}, which no longer exists in the '
+                f'generated world'
+            )
+
+
+def test_the_documented_doorway_width_matches_the_firewall(spec):
+    """The Pinch's width is quoted in the README and load-bearing in the tests."""
+    south = next(b for b in spec.boxes if b.name == 'firewall_south')
+    north = next(b for b in spec.boxes if b.name == 'firewall_mid')
+    width = (north.y - north.size_y / 2.0) - (south.y + south.size_y / 2.0)
+
+    import re
+
+    for name, text in _docs_text().items():
+        if 'Pinch' not in text:
+            continue
+        assert f'{width:.2f} m doorway' in text, (
+            f'{name} does not describe The Pinch as a {width:.2f} m doorway. '
+            f'That number is what the yielding protocol depends on.'
+        )
+        # EVERY mention, not just one. Checking presence alone passes while a
+        # second, stale mention sits three lines further down -- which is
+        # exactly how the 2.0 m figure survived the widening to 2.10 m.
+        quoted = {float(v) for v in re.findall(r'([0-9]+\.[0-9]+) m doorway', text)}
+        assert quoted == {round(width, 2)}, (
+            f'{name} quotes doorway widths {sorted(quoted)} but the firewall '
+            f'leaves {width:.2f} m. Every mention has to agree, or a reader '
+            f'takes whichever one they saw first.'
+        )
+
+
+def test_the_committed_landmark_manifest_is_current(spec):
+    """The C++ slope tests read this file, so a stale copy is a silent lie.
+
+    The manifest exists because five C++ tests used to hardcode ramp probe
+    points and gradients, and had been asserting against a warehouse that no
+    longer existed. Deriving only helps if the derived artefact is regenerated
+    when the world changes -- otherwise the hardcoded constants have simply
+    moved into a file.
+    """
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        'maps', 'warehouse_landmarks.txt')
+    assert os.path.isfile(path), (
+        'maps/warehouse_landmarks.txt is missing; the C++ slope tests cannot '
+        'locate the ramps without it'
+    )
+    with open(path, 'r', encoding='utf-8') as handle:
+        on_disk = handle.read()
+
+    assert on_disk == wb.render_landmarks(spec), (
+        'the committed landmark manifest no longer matches the generated '
+        'world. Regenerate it with `ros2 run amr_gazebo generate_world.py` -- '
+        'until then the C++ slope tests are measuring the wrong ramps.'
+    )
+
+
+def test_every_ramp_and_deck_appears_in_the_manifest(spec):
+    """A ramp the manifest omits is a ramp nothing checks."""
+    manifest = wb.render_landmarks(spec)
+    for ramp in spec.ramps:
+        assert f'ramp {ramp.name} ' in manifest, f'{ramp.name} missing'
+    for deck in spec.decks:
+        assert f'deck {deck.name} ' in manifest, f'{deck.name} missing'
+
+    records = [line for line in manifest.splitlines()
+               if line and not line.startswith('#')]
+    assert len(records) == len(spec.ramps) + len(spec.decks)

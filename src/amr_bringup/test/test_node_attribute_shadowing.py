@@ -143,3 +143,39 @@ def test_every_demo_script_parses_and_defines_a_main():
             tree = ast.parse(handle.read(), filename=name)
         functions = {n.name for n in tree.body if isinstance(n, ast.FunctionDef)}
         assert 'main' in functions, f'{name} has no main()'
+
+
+def test_no_script_selects_a_logger_severity_through_a_variable():
+    """`level = logger.info if ok else logger.error` is a latent crash.
+
+    rclpy caches severity against the *caller location*. Both branches resolve
+    to one source line, so the first failure after a success raises
+    `ValueError: Logger severity cannot be changed between calls` -- from
+    inside an action result callback, which kills the executor and takes the
+    script down while goals are still in flight. It is invisible until a goal
+    actually fails, which is why it survived until now.
+    """
+    import glob
+    import os
+    import re
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    src = os.path.normpath(os.path.join(here, os.pardir, os.pardir))
+
+    pattern = re.compile(
+        r'=\s*(?:self\.)?get_logger\(\)\.\w+\s+if\b|'
+        r'=\s*(?:self\.)?get_logger\(\)\.\w+\s*$')
+    offenders = []
+    for path in glob.glob(os.path.join(src, '**', '*.py'), recursive=True):
+        if os.sep + 'test' + os.sep in path:
+            continue
+        with open(path, 'r', encoding='utf-8') as handle:
+            for number, line in enumerate(handle, 1):
+                if pattern.search(line.split('#', 1)[0]):
+                    offenders.append(f'{os.path.basename(path)}:{number}')
+
+    assert not offenders, (
+        'a logger method is being bound to a variable and called from one '
+        f'line with two severities: {offenders}. Call the logger directly on '
+        f'each branch instead.'
+    )

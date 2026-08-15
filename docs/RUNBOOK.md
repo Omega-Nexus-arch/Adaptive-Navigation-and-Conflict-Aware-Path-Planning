@@ -410,6 +410,8 @@ milliseconds.
 | Pedestrians visible but never sensed | `ros2 topic echo /amr1/scan --once` while one crosses in front | Actor bone collisions must be present. Confirm the world has `<collision` inside each `<actor>`; regenerate if not. |
 | AMR stalls at the foot of a ramp | `ros2 run amr_bringup check_model_consistency.py` | Confirms the steepest ramp is within every model's `max_traversable_angle_degrees`. Ramps are 5-9 deg; anything above ~10 deg is not climbable by these drivetrains. |
 | A robot hunts or stalls **in the firewall doorway** | `ros2 param get /amr1/local_costmap/local_costmap inflation_radius` | Should be 0.60 (= `footprint_radius` + 0.05), not 0.75. A corridor of width `W` leaves a zero-cost centre band of `W - 2*inflation_radius`; the 2.10 m doorway needs the small padding to leave 0.90 m of it. Covered by `test_pinch_admits_one_robot_but_not_two`. See DESIGN_NOTES 8r. |
+| Robot takes a ramp when a flat route exists | `ros2 param get /amr1/global_costmap/global_costmap slope_layer.base_cost` | Should be 200. Slope cost must exceed the flat detour it is meant to prevent. |
+| A ramp-only goal (mezzanine_storage) is unreachable | `ros2 param get /amr1/global_costmap/global_costmap slope_layer.max_cost` | Must be 252, never 253. 253 is INSCRIBED_INFLATED_OBSTACLE and Smac refuses it outright, so the ramp becomes impassable rather than expensive. See 8s. |
 | A robot creeps or stalls on a ramp | `ros2 run amr_bringup check_model_consistency.py` | `plant_accel_limit` must exceed both the model's own `max_accel_x` and `g*sin(theta)` on the steepest ramp (1.53 m/s^2 at 9 deg). It is in rad/s^2 once the xacro divides by wheel radius. |
 | AMRs drive through pedestrians | - | The actor's bone collision column must span the scan plane. `test_a_human_is_solid_across_both_scan_planes` checks it; regenerate the world if the check passes but the sim disagrees. |
 | `xacro: not well-formed (invalid token)` | - | An XML comment contains `--`, which is illegal. `test_no_xacro_comment_contains_a_double_hyphen` catches it. |
@@ -464,7 +466,7 @@ grouped rather than listed individually.
 |---|---|
 | `amr_gazebo/world_builder.py` | **Generates the world.** One geometric description emits the SDF, the elevation map and the waypoints, so they cannot disagree. |
 | `scripts/generate_world.py` | CLI wrapper for the above. |
-| `scripts/dynamic_obstacle_driver.py` | Drives 6 collision-bearing obstacles on seeded patrol loops. |
+| `scripts/dynamic_obstacle_driver.py` | Drives the rigid third-party obstacles on seeded patrol loops. The pedestrians are Gazebo actors and follow scripted trajectories inside the world file instead. |
 | `worlds/warehouse_multilevel.world` | Generated. The Pinch, Hump Bridge, mezzanine, racks. |
 | `maps/warehouse_elevation.{pgm,yaml}` | Generated. What the slope planner reads. |
 | `config/waypoints.yaml` | Generated. Named goals. |

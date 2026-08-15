@@ -1380,6 +1380,125 @@ skipped; the same rule expressed as a test over *every* passage does not. The
 guard now derives its inputs, so the next time the padding changes the doorway
 is re-checked whether or not I remember to.
 
+## 8s. Making a ramp a last resort without making it impossible
+
+**Requirement:** the ramps should be used only when there is no flat way to the
+goal. They were priced as mild inconveniences — 49, 57 and 92 on a 0..254 scale
+— so a slope that saved a few metres was simply taken.
+
+**The constraint that makes this awkward.** nav2_smac_planner charges a cell as
+
+```
+effective length = cell_size * (1 + cost_travel_multiplier * cost / 252)
+```
+
+so cost buys avoidance smoothly — right up until 253, where it stops being a
+price at all. 253 is `INSCRIBED_INFLATED_OBSTACLE`, and `Node2D::isNodeValid`
+**refuses** any cell at or above it. There is no gradual approach to "never":
+252 is expensive, 253 is impassable.
+
+The cost model already knew this was a hazard and got the number wrong. It
+clamps to `kLethal - 1` = 253, with a comment explaining that pricing a
+traversable slope at 254 would break the "ramps are used when they are the only
+viable path" half of the requirement. The comment is right and the constant is
+off by one — 253 breaks it just as thoroughly, and `max_cost: 253` was the
+shipped default.
+
+**Fix.**
+
+| | was | now | |
+|---|---|---|---|
+| `base_cost` | 40 | **200** | even a barely-tilted cell is expensive |
+| `max_cost` | 253 | **252** | the highest cost Smac will still expand into |
+| `curve_exponent` | 2.0 | **1.0** | a curve above 1 made the *gentle* ramps cheap |
+
+The exponent change matters more than it looks. A steep ramp prices itself out
+anyway; the 5° service ramp is the one that looks like a shortcut, and a
+squared curve is precisely what made it cheap. With `base_cost` at 200 the
+question is no longer *how steep* a cell is but *whether it is a ramp at all*.
+
+Resulting prices: 5° → 211, 6° → 214, 9° → 225. At `cost_travel_multiplier`
+3.0, a metre of ramp now costs about 3.5 m of flat floor.
+
+**Verified against the world, not asserted.** A Dijkstra over the generated
+elevation map, using Smac's own cell pricing:
+
+```
+dock_a -> east_staging, doorway open   : 36.10   ramp used: no
+dock_a -> east_staging, doorway sealed : 54.15   ramp used: yes
+```
+
+The planner accepts **18 m** of extra effective distance rather than climb —
+comfortably more than the spread of ordinary routes here — and still crosses
+the bridge the moment it is the only crossing. `dock_a -> mezzanine_storage`,
+whose goal sits on the deck, remains reachable at 46.03.
+
+**Guards.** Both halves are asserted, because either alone is trivially
+satisfiable: make ramps free and the first fails, make them lethal and the
+second does. Five negative controls; four fail. The fifth — raising
+`curve_exponent` alone — does not, and that is correct rather than a gap: with
+`base_cost` at 200 the exponent genuinely cannot move the price much. So the
+guard pins the *property* instead of the knob: the shallowest ramp in the world
+must price above 190, however `base_cost`, `max_cost` and `curve_exponent` are
+traded off to get there.
+
+The routing tests run on a 15 cm grid rather than the 5 cm one the geometry
+tests use. Half a million cells of Python Dijkstra, several times over, is a
+slow test suite; 15 cm still resolves the aisles and the doorway, and a 15 cm
+step up the steepest ramp is 24 mm, inside `MAX_STEP`.
+
+## 8t. Five tests describing a warehouse that no longer existed
+
+Found during a full audit against the brief, not from a failure report — which
+is the point: **nothing was reporting it.**
+
+`amr_navigation`'s slope tests carried the world's geometry as literals:
+
+```cpp
+{"hump_ramp_west",   -3.4, 3.6,   8.7},
+{"mezz_ramp_steep",  10.5, 6.65, 14.8},
+EXPECT_NEAR(map.HeightAt(0.0, 3.6), 0.55, tolerance);
+```
+
+Every one of those numbers was true when written. The world is **generated**,
+and it has been regenerated repeatedly since — ramps flattened 14.8° → 9°,
+decks lowered, the mezzanine moved to the north wall. The constants never
+followed. Five tests had been failing, and `colcon test` would have failed on
+submission.
+
+The same drift had reached the prose. The README and the traceability table
+described 8.7° ramps, 2.4 m aisles, a 2.0 m doorway and six dynamic obstacles;
+the world has 6.0° ramps, 4.0 m aisles, a 2.10 m doorway and five. A reviewer
+who measured the world would have concluded the requirement was unmet.
+
+**Fix: derive, don't duplicate** — the same rule already applied to the robot
+models and the fleet roster, never applied to the world. `world_builder` now
+emits `maps/warehouse_landmarks.txt` alongside the world and the elevation map:
+
+```
+ramp hump_ramp_west -3.4100 3.6000 5.9925
+deck hump_deck 0.0000 3.6000 0.3800
+```
+
+Whitespace-separated so the C++ side needs an `ifstream` and nothing more. The
+slope tests read it instead of quoting it, so a ramp cannot move without the
+tests following. `test_the_committed_landmark_manifest_is_current` fails if the
+file is stale, which is what stops the constants simply relocating into a file.
+
+**Also fixed, from the same audit:** the C++ test asserting the cost ceiling
+said `EXPECT_LE(worst, 253)` directly beneath a comment explaining that 253 is
+refused outright. The comment was right and the assertion permitted exactly the
+value it warned about — the same off-by-one that `max_cost: 253` carried in the
+config (8s). Two independent expressions of one misunderstanding, neither
+catching the other.
+
+**What I would take from this.** I wrote guard tests all through this project
+and trusted them to hold the line. These ones had been failing for days without
+anyone noticing, because they need a compile definition to locate their data
+and I had never built that package in this sandbox. A test you cannot run is
+not a guard, it is a comment — and the docs drifted the same way for the same
+reason: nothing executed them either. Now something does.
+
 ## 9. What I would do next
 
 Honest gaps, roughly in the order I would close them.

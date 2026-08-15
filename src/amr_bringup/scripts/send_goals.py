@@ -130,8 +130,18 @@ class GoalDispatcher(Node):
             # 4 == STATUS_SUCCEEDED
             succeeded = status == 4
             self.results[robot] = succeeded
-            level = self.get_logger().info if succeeded else self.get_logger().error
-            level(f'{robot}: {"reached its goal" if succeeded else f"failed (status {status})"}')
+            # TWO CALL SITES, NOT ONE VARIABLE.
+            #
+            # rclpy caches a logger's severity against the *caller location*,
+            # and a variable holding either .info or .error resolves to a
+            # single line -- so the first failure after a success raises
+            # `ValueError: Logger severity cannot be changed between calls`
+            # from inside the action result callback, which kills the executor
+            # and takes the whole script down while goals are still in flight.
+            if succeeded:
+                self.get_logger().info(f'{robot}: reached its goal')
+            else:
+                self.get_logger().error(f'{robot}: failed (status {status})')
             self.pending.discard(robot)
         return callback
 

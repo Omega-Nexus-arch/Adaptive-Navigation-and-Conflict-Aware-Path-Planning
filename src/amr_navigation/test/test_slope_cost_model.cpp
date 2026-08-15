@@ -10,6 +10,9 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <sstream>
+#include <fstream>
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -69,7 +72,11 @@ TEST(SlopeCostModelTest, CostMustStayBelowInscribedInflatedObstacle) {
   // which would silently break the "only viable path" case.
   const SlopeCostModel model(HeavyOptions());
   const std::uint8_t worst = model.CostForAngle(15.99 * kDegrees);
-  EXPECT_LE(worst, 253);
+  // STRICTLY below 253. The comment above always said "a ramp priced at either
+  // is refused outright"; the assertion said `<= 253`, which permits exactly
+  // the value it warns about. nav2_params.yaml carried the same off-by-one as
+  // `max_cost: 253`. See DESIGN_NOTES 8s.
+  EXPECT_LT(worst, 253);
   EXPECT_LT(worst, SlopeCostModel::kLethal);
 }
 
@@ -134,6 +141,59 @@ TEST(ElevationMapTest, LoadsTheGeneratedWarehouseMap) {
   EXPECT_NEAR(map.origin_y, -15.0, 1e-9);
 }
 
+/// \brief One ramp or deck, as emitted by world_builder.render_landmarks.
+struct Landmark
+{
+  std::string kind;      ///< "ramp" or "deck"
+  std::string name;
+  double x = 0.0;
+  double y = 0.0;
+  double value = 0.0;    ///< degrees for a ramp, height in metres for a deck.
+};
+
+/// \brief Read the generated landmark table.
+///
+/// These figures used to be hardcoded here -- probe points at (7.0, 5.85) and
+/// gradients of 8.7 and 14.8 degrees. The world is GENERATED, it was
+/// regenerated many times, and the constants were never updated, so five tests
+/// in this file had been asserting against a warehouse that no longer existed.
+/// The file below is written by the same pass that writes the world, so a ramp
+/// cannot move without these tests following it.
+std::vector<Landmark> Landmarks()
+{
+  const std::string path =
+    std::string(AMR_NAVIGATION_TEST_DATA_DIR) + "/warehouse_landmarks.txt";
+  std::ifstream input(path);
+  EXPECT_TRUE(input.is_open())
+    << "missing " << path << " -- regenerate the world with "
+    << "`ros2 run amr_gazebo generate_world.py`";
+
+  std::vector<Landmark> found;
+  std::string line;
+  while (std::getline(input, line)) {
+    if (line.empty() || line[0] == '#') {
+      continue;
+    }
+    std::istringstream fields(line);
+    Landmark entry;
+    if (fields >> entry.kind >> entry.name >> entry.x >> entry.y >> entry.value) {
+      found.push_back(entry);
+    }
+  }
+  return found;
+}
+
+std::vector<Landmark> LandmarksOfKind(const std::string & kind)
+{
+  std::vector<Landmark> chosen;
+  for (const Landmark & entry : Landmarks()) {
+    if (entry.kind == kind) {
+      chosen.push_back(entry);
+    }
+  }
+  return chosen;
+}
+
 TEST(ElevationMapTest, DecodesTheKnownHeightsOfTheWorld) {
   const ElevationMap map = ElevationMap::FromFiles(WarehouseElevationPath());
   // Comfortably above one LSB of the height encoding (0.69 m / 255).
@@ -141,8 +201,12 @@ TEST(ElevationMapTest, DecodesTheKnownHeightsOfTheWorld) {
 
   EXPECT_NEAR(map.HeightAt(-18.5, 2.2), 0.00, tolerance) << "west dock";
   EXPECT_NEAR(map.HeightAt(17.2, 2.0), 0.00, tolerance) << "packing bay 4";
-  EXPECT_NEAR(map.HeightAt(0.0, 3.6), 0.55, tolerance) << "hump bridge deck";
-  EXPECT_NEAR(map.HeightAt(7.0, 10.5), 0.45, tolerance) << "mezzanine deck";
+
+  const std::vector<Landmark> decks = LandmarksOfKind("deck");
+  EXPECT_FALSE(decks.empty()) << "the world should declare at least one deck";
+  for (const Landmark & deck : decks) {
+    EXPECT_NEAR(map.HeightAt(deck.x, deck.y), deck.value, tolerance) << deck.name;
+  }
 }
 
 TEST(ElevationMapTest, OutOfBoundsQueriesFallBack) {
@@ -173,26 +237,16 @@ TEST(SlopeCostModelTest, TheGeneratedRampsMeasureTheirDocumentedGradient) {
   const ElevationMap map = ElevationMap::FromFiles(WarehouseElevationPath());
   const SlopeCostModel model(HeavyOptions());
 
-  struct Probe
-  {
-    const char * name;
-    double x;
-    double y;
-    double expected_degrees;
-  };
-  const Probe probes[] = {
-    {"hump_ramp_west", -3.4, 3.6, 8.7},
-    {"hump_ramp_east", 3.4, 3.6, 8.7},
-    {"mezz_ramp_gentle", 7.0, 5.85, 7.8},
-    {"mezz_ramp_steep", 10.5, 6.65, 14.8},
-  };
+  const std::vector<Landmark> ramps = LandmarksOfKind("ramp");
+  EXPECT_FALSE(ramps.empty()) << "the world should declare at least one ramp";
 
-  for (const Probe & probe : probes) {
+  for (const Landmark & probe : ramps) {
     const SlopeSample sample = model.SampleSlope(map, probe.x, probe.y);
     ASSERT_TRUE(sample.valid) << probe.name;
     // Tolerance covers the 1/255 quantisation of the height encoding.
-    EXPECT_NEAR(sample.angle / kDegrees, probe.expected_degrees, 1.5)
-      << probe.name << " measured " << sample.angle / kDegrees << " deg";
+    EXPECT_NEAR(sample.angle / kDegrees, probe.value, 1.5)
+      << probe.name << " measured " << sample.angle / kDegrees
+      << " deg, world declares " << probe.value;
   }
 }
 
@@ -203,16 +257,15 @@ TEST(SlopeCostModelTest, EveryShippedRampIsAvoidableButUsable) {
   const ElevationMap map = ElevationMap::FromFiles(WarehouseElevationPath());
   const SlopeCostModel model(HeavyOptions());
 
-  const double ramp_points[][2] = {
-    {-3.4, 3.6}, {3.4, 3.6}, {7.0, 5.85}, {10.5, 6.65},
-  };
-  for (const auto & point : ramp_points) {
-    const std::uint8_t cost = model.CostAt(map, point[0], point[1]);
-    EXPECT_GT(cost, 0) << "ramp at (" << point[0] << ", " << point[1] << ") is free, so the "
-      "planner has no reason to prefer the flat route";
-    EXPECT_LT(cost, SlopeCostModel::kLethal)
-      << "ramp at (" << point[0] << ", " << point[1] << ") is impassable, so the "
-      "mezzanine can never be reached";
+  for (const Landmark & ramp : LandmarksOfKind("ramp")) {
+    const std::uint8_t cost = model.CostAt(map, ramp.x, ramp.y);
+    EXPECT_GT(cost, 0) << ramp.name << " is free, so the planner has no reason "
+      "to prefer the flat route";
+    // Below INSCRIBED_INFLATED_OBSTACLE, not merely below LETHAL: Smac's
+    // Node2D::isNodeValid refuses 253 outright, so a ramp priced there is
+    // impassable rather than expensive and the mezzanine becomes unreachable.
+    EXPECT_LT(cost, 253)
+      << ramp.name << " is priced at or above the planner's refusal threshold";
   }
 }
 
@@ -220,8 +273,16 @@ TEST(SlopeCostModelTest, TheSteepMezzanineRampCostsMoreThanTheGentleOne) {
   const ElevationMap map = ElevationMap::FromFiles(WarehouseElevationPath());
   const SlopeCostModel model(HeavyOptions());
 
-  const std::uint8_t gentle = model.CostAt(map, 7.0, 5.85);
-  const std::uint8_t steep = model.CostAt(map, 10.5, 6.65);
+  const std::vector<Landmark> ramps = LandmarksOfKind("ramp");
+  ASSERT_GE(ramps.size(), 2u);
+  const Landmark & shallowest = *std::min_element(
+    ramps.begin(), ramps.end(),
+    [](const Landmark & a, const Landmark & b) {return a.value < b.value;});
+  const Landmark & steepest = *std::max_element(
+    ramps.begin(), ramps.end(),
+    [](const Landmark & a, const Landmark & b) {return a.value < b.value;});
+  const std::uint8_t gentle = model.CostAt(map, shallowest.x, shallowest.y);
+  const std::uint8_t steep = model.CostAt(map, steepest.x, steepest.y);
   EXPECT_LT(gentle, steep)
     << "the planner would have no reason to prefer the service ramp";
 }
@@ -261,10 +322,24 @@ TEST(SlopeCostModelTest, TheGradientDoesNotDependOnWhereInACellYouAsk) {
   const ElevationMap map = ElevationMap::FromFiles(WarehouseElevationPath());
   const SlopeCostModel model(HeavyOptions());
 
-  const double base_x = -3.4;
-  const double base_y = 3.6;
+  const std::vector<Landmark> ramps = LandmarksOfKind("ramp");
+  ASSERT_FALSE(ramps.empty());
+  const Landmark & probe = ramps.front();
+  // Snap to the CENTRE of whichever cell the probe lands in. The claim under
+  // test is that sampling anywhere inside ONE cell gives one answer, so the
+  // base point has to be a cell centre -- a landmark sitting 1 cm off centre
+  // puts the +/- 24 mm sweep across a boundary and fails for the wrong reason.
+  const auto cell_centre = [&map](double value, double origin) {
+      return origin + (std::floor((value - origin) / map.resolution) + 0.5) *
+             map.resolution;
+    };
+  const double base_x = cell_centre(probe.x, map.origin_x);
+  const double base_y = cell_centre(probe.y, map.origin_y);
   const double reference = model.SampleSlope(map, base_x, base_y).angle;
-  EXPECT_GT(reference / kDegrees, 7.0) << "the probe must actually be on the ramp";
+  // Half the declared gradient, so the check survives the height quantisation
+  // without becoming a restatement of the previous test.
+  EXPECT_GT(reference / kDegrees, probe.value * 0.5)
+    << "the probe must actually be on " << probe.name;
 
   for (double dx = -0.024; dx <= 0.024; dx += 0.008) {
     for (double dy = -0.024; dy <= 0.024; dy += 0.008) {

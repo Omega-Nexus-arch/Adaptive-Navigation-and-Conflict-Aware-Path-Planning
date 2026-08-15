@@ -14,13 +14,16 @@ behaviour regresses. **Demo** means a script that exits non-zero on failure.
 |---|---|---|---|
 | 1.1 | **AMR-1 (Mapper/Lead)** — accurate global localisation and path planning, higher payload | `robot_models.yaml:heavy_mapper` (120 kg, 1080-beam 25 m LiDAR), `fleet.yaml` priority 100 | Test: `ModelLibraryTest.TheHeavyModelIsTheLessAgileOne`, `test_the_shipped_roster_matches_the_brief` |
 | 1.2 | **AMR-2 (Scout/Follower)** — speed and dynamic obstacle avoidance, lower payload, **higher acceleration limits** | `robot_models.yaml:light_scout` (30 kg, 30 Hz LiDAR, accel 1.10 vs 0.35 m/s²) | Test: `DynamicLimits.HeavyUnitIsLessAgileThanScoutInEveryState` sweeps all load/speed states |
-| 1.3 | **Large multi-level structure with ramps** | 44×30 m world; Hump Bridge 0.55 m with 8.7° ramps, mezzanine deck 0.45 m with 7.8° and 14.8° ramps | Test: `test_ramp_gradients_match_documentation`, `test_ramp_slab_pose_matches_elevation_model` |
-| 1.4 | **Complex, initially unknown aisle layouts** | Three rack blocks, 2.4 m aisles, cross-aisles; no prior map — SLAM starts blank | Test: `test_primary_goals_are_reachable_from_the_docks` |
+| 1.3 | **Large multi-level structure with ramps** | 44×30 m world; Hump Bridge 0.38 m with 6.0° ramps, mezzanine deck 0.40 m with 5.0° and 9.0° ramps | Test: `test_ramp_gradients_match_documentation`, `test_ramp_slab_pose_matches_elevation_model` |
+| 1.4 | **Complex, initially unknown aisle layouts** | Three rack blocks, 4.0 m aisles, 3.0 m cross-aisles; no prior map — SLAM starts blank | Test: `test_primary_goals_are_reachable_from_the_docks` |
 | 1.5 | **Static storage racks** | `_storage_block()` generates segmented rows | Test: `test_no_waypoint_sits_inside_an_obstacle` |
-| 1.6 | **Frequent randomly moving dynamic obstacles** | 6 collision-bearing models (4 pedestrians, 2 third-party robots) on seeded patrol loops with dwell and corner-cutting | Test: `test_no_dynamic_obstacle_spawns_inside_geometry`, `test_no_patrol_leg_passes_through_a_static_body` (samples every leg at 5 cm, inflated by the body radius), `test_every_dynamic_obstacle_starts_on_its_own_loop`, `test_dynamic_obstacles_expose_a_cmd_vel_interface` |
+| 1.6 | **Frequent randomly moving dynamic obstacles** | 5 collision-bearing bodies (4 animated pedestrians, 1 third-party robot) on seeded patrol loops with dwell and corner-cutting | Test: `test_no_dynamic_obstacle_spawns_inside_geometry`, `test_no_patrol_leg_passes_through_a_static_body` (samples every leg at 5 cm, inflated by the body radius), `test_every_dynamic_obstacle_starts_on_its_own_loop`, `test_dynamic_obstacles_expose_a_cmd_vel_interface` |
 
-> Gazebo Classic `<actor>` elements have no collision geometry and are invisible
-> to a LiDAR. Real models are used so obstacle avoidance is genuine.
+> Gazebo Classic `<actor>` elements are animated but carry **no collision
+> geometry by default**, which makes them invisible to a LiDAR — the AMRs drove
+> straight through them. The pedestrians are actors (so they run, rather than
+> slide), with explicit per-bone collision spheres declared to form a
+> continuous column from the floor to chest height. See DESIGN_NOTES 8o.
 
 ---
 
@@ -32,8 +35,8 @@ behaviour regresses. **Demo** means a script that exits non-zero on failure.
 | 2.2 | **Selective mapping: prioritise unexplored boundaries** | `SelectiveMappingPolicy::IsFrontier` — frontier cells bypass all throttling | Test: `SelectiveMappingTest.FrontierCellsAreNeverThrottled`, `TheEdgeOfTheKnownGridCountsAsFrontier` |
 | 2.3 | **Selective mapping: reduce update frequency for repeatedly traversed areas** | Per-cell visit counters from actual traversal; `saturated_period` (5 s) vs `explored_period` (1 s) | Test: `RepeatedlyTraversedRegionsAreThrottled` (>90% suppression), `SuppressionRisesWithFamiliarity` |
 | 2.4 | **Concurrent goals for both robots** | `send_goals.py` dispatches and awaits together | Demo: `send_goals.py --goal amr1=heavy_storage --goal amr2=packing_bay_4` |
-| 2.5 | **Ramp/slope traversability cost function** | `amr_navigation::SlopeCostModel` — `cost = base + (253−base)·f(θ)^γ`, lethal beyond the per-model climbing limit; `SlopeLayer` nav2 plugin | Test: 19 tests incl. `TheGeneratedRampsMeasureTheirDocumentedGradient` against the real elevation map |
-| 2.6 | **Minimise ramp use unless the only viable path** | Ramps priced high but strictly below `LETHAL`; the world provides a flat alternative (The Pinch) and a ramp-only goal (mezzanine) | Test: `EveryShippedRampIsAvoidableButUsable`, `TheFlatDoorwayIsCheaperThanTheSlopedBridge`, `test_mezzanine_is_reachable_only_by_ramp`. Demo: `demo_slope_planning.py` (A/B/C) |
+| 2.5 | **Ramp/slope traversability cost function** | `amr_navigation::SlopeCostModel` — `cost = base + (252−base)·f(θ)^γ`, lethal beyond the per-model climbing limit; `SlopeLayer` nav2 plugin | Test: 19 tests incl. `TheGeneratedRampsMeasureTheirDocumentedGradient`, which reads ramp positions and gradients from the generated `maps/warehouse_landmarks.txt` rather than quoting them |
+| 2.6 | **Minimise ramp use unless the only viable path** | Ramps priced at 200-225, high enough that the planner accepts ~18 m of detour to stay flat, but strictly below `INSCRIBED_INFLATED_OBSTACLE` (253) — **not** merely below `LETHAL` (254), because Smac's `Node2D::isNodeValid` refuses 253 outright. The world provides a flat alternative (The Pinch) and a ramp-only goal (mezzanine) | Test: `EveryShippedRampIsAvoidableButUsable`, `TheFlatDoorwayIsCheaperThanTheSlopedBridge`, `test_mezzanine_is_reachable_only_by_ramp`. Demo: `demo_slope_planning.py` (A/B/C) |
 
 > 2.6 is the requirement most easily faked. `demo_slope_planning.py` includes a
 > control trial with the slope layer disabled, because "the planner avoided the
@@ -49,7 +52,7 @@ behaviour regresses. **Demo** means a script that exits non-zero on failure.
 | 3.2 | **Limits depend on dynamic state (speed, payload)** | `DynamicLimits::EffectiveAccelX(load_ratio, speed_ratio)`; payload injected at runtime via `SetPayload` | Test: `PayloadSlowsTheAccelerationRamp`, `AccelerationTapersAsSpeedRises` |
 | 3.3 | **Physically appropriate per type — AMR-1 lower accel than AMR-2** | Model library; enforced by the consistency checker | Test: `HeavyUnitRampsSlowerThanTheScout` (measured end-to-end, not read from config) |
 | 3.4 | **Local planner consumes peers' projected trajectories** | `TrajectoryPredictor` → `/fleet/trajectories` → `amr_navigation::FleetTrajectoryLayer` writes time-decayed cost into each robot's local costmap | Test: `TrajectoryPredictorTest.*` (6 tests); layer registered in `nav2_params.yaml:local_costmap.fleet_layer` |
-| 3.5 | **Traffic Control Node enforces a yielding protocol — lighter AMR-2 yields to AMR-1 — via a temporary controlled stop** | `ConflictDetector` (space-time) + `YieldPolicy` (priority); the directive scales the *target* velocity so the smoother shapes the stop | Test: `TheScoutYieldsToTheHeavyMapper`, `YieldScaleProducesAJerkLimitedStopNotACut`. Demo: `demo_conflict.py` |
+| 3.5 | **Traffic Control Node enforces a yielding protocol — lighter AMR-2 yields to AMR-1 — via a temporary controlled stop** | `ConflictDetector` (space-time) + `YieldPolicy` (priority); the directive scales the *target* velocity so the smoother shapes the stop. The Pinch is a 2.10 m doorway — sized so two robots abreast fall inside the detector's conflict threshold, forcing the protocol to fire rather than letting them squeeze past | Test: `TheScoutYieldsToTheHeavyMapper`, `YieldScaleProducesAJerkLimitedStopNotACut`. Demo: `demo_conflict.py` |
 | 3.6 | **Safety node monitors local obstacle detection** | `safety_override_node` subscribes to the BSP-validated `scan`; decision runs in the scan callback, not on a timer | Test: 19 `SafetyMonitorTest` cases |
 | 3.7 | **Speed-dependent threshold `d_safe = k·v² + d_min`** | `SafetySpec::SafeDistance` | Test: `SafeDistanceFollowsTheQuadraticLaw`, `TheEnvelopeGrowsWithSpeed` |
 | 3.8 | **Immediate halt that bypasses/overrides the nav stack's velocity command** | `safety_override_node` is the *sole* publisher of `cmd_vel`; on violation it discards the upstream command outright | Test: `PedestrianStepsOutInFrontOfAMovingRobot`. Demo: `demo_safety_override.py` measures the override against a hostile command stream |

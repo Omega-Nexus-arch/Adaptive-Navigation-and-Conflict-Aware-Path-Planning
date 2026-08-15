@@ -220,7 +220,7 @@ speed, and the measured reaction latency from the sensor's own timestamp.
 ros2 run amr_bringup demo_conflict.py
 ```
 
-Sends both robots through The Pinch — a 2.0 m doorway, wide enough for one — from
+Sends both robots through The Pinch — a 2.10 m doorway, wide enough for one — from
 opposite sides simultaneously. Prints a timeline of directives, how long the
 loser was held, and the minimum separation actually achieved. Fails if the wrong
 robot yielded, if neither did, or if they came closer than their combined
@@ -298,10 +298,10 @@ Features, and what each exists to exercise:
 | Feature | Purpose |
 |---|---|
 | **Central firewall** at x = 0 | Splits the floor with exactly two crossings, so route choice is observable rather than incidental. |
-| **The Pinch** (2.0 m doorway) | The flat crossing. One robot fits, two do not → the yielding protocol has to fire. |
-| **Hump Bridge** (0.55 m, 8.7° ramps, 3.0 m wide) | The sloped crossing. Wider and more comfortable than The Pinch in every respect except gradient — so a planner that ignores slope will happily use it. |
-| **Mezzanine deck** (0.45 m, 7.8° and 14.8° ramps) | Reachable *only* by ramp. Forces the "only viable path" case, and makes the planner price two gradients against each other. |
-| **Rack blocks**, 2.4 m aisles | Real aisle-routing problems for the global planner. |
+| **The Pinch** (2.10 m doorway) | The flat crossing. One robot fits, two do not → the yielding protocol has to fire. |
+| **Hump Bridge** (0.38 m, 6.0° ramps, 3.0 m wide) | The sloped crossing. Wider and more comfortable than The Pinch in every respect except gradient — so a planner that ignores slope will happily use it. |
+| **Mezzanine deck** (0.40 m, 5.0° and 9.0° ramps) | Reachable *only* by ramp. Forces the "only viable path" case, and makes the planner price two gradients against each other. |
+| **Rack blocks**, 4.0 m aisles with 3.0 m cross-aisles | Real aisle-routing problems for the global planner. |
 | **6 dynamic obstacles** | Four pedestrians and two third-party robots, on seeded patrol loops. Real models with collision geometry, so the LiDAR genuinely sees them. |
 
 > Gazebo Classic `<actor>` elements carry no collision geometry and are
@@ -473,7 +473,7 @@ ros2 topic hz /amr1/scan                       # is validated data flowing at al
 `/amr1/map_contribution` is publishing, and that the static transforms
 `map → amr1/map` exist (`ros2 run tf2_tools view_frames`).
 
-**The planner refuses the mezzanine.** Its ramps are 7.8° and 14.8°. If
+**The planner refuses the mezzanine.** Its ramps are 5.0° and 9.0°. If
 `max_traversable_angle_degrees` is set below 15, the steep ramp is correctly
 lethal — that is the per-model limit doing its job. Check the loaded value:
 
