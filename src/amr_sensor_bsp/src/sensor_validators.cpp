@@ -37,13 +37,38 @@ LidarValidator::LidarValidator(const amr_core::LidarSpec & spec, const Options &
 
 double LidarValidator::GroundReturnRange() const
 {
-  const double pitch = std::abs(pitch_);
-  if (!options_.ground_rejection_enabled || pitch < options_.ground_rejection_pitch) {
+  return GroundReturnRangeAt(0.0);
+}
+
+double LidarValidator::GroundReturnRangeAt(double bearing) const
+{
+  // NOSE-DOWN ONLY, AND PER BEAM.
+  //
+  // REP-103 body frame is x forward, y left, z up, so a positive rotation
+  // about +y tips x downward: positive pitch means nose down, i.e. the robot
+  // is descending and the beam is aimed at the floor.
+  //
+  // But only the beams pointing *forward* are aimed at the floor. A 360 degree
+  // scanner pitched nose-down by `p` tilts a beam at bearing `phi` by
+  // `sin(p) * cos(phi)`: full tilt ahead, none at 90 degrees, and upward
+  // behind. Using the forward figure for every beam is what erased the far
+  // field across the whole scan and left fan-shaped voids in the costmap.
+  if (!options_.ground_rejection_enabled || pitch_ < options_.ground_rejection_pitch) {
     return std::numeric_limits<double>::infinity();
   }
-  // Beam leaves the sensor level with the chassis; the chassis is pitched by
-  // `pitch`; it meets the floor at h / sin(pitch).
-  return spec_.height / std::sin(pitch);
+
+  // Outside the forward arc the tilt is shallow, the predicted range runs off
+  // to tens of metres, and "floor" stops being distinguishable from "far wall".
+  if (std::abs(std::atan2(std::sin(bearing), std::cos(bearing))) > options_.ground_rejection_arc) {
+    return std::numeric_limits<double>::infinity();
+  }
+
+  const double tilt = std::sin(pitch_) * std::cos(bearing);
+  if (tilt <= kMinimumGroundTilt) {
+    // Level or aimed above the horizon: this beam cannot reach the floor.
+    return std::numeric_limits<double>::infinity();
+  }
+  return spec_.height / tilt;
 }
 
 ValidationResult LidarValidator::Validate(
@@ -82,15 +107,17 @@ ValidationResult LidarValidator::Validate(
   // ---- Content checks ----------------------------------------------------
   std::size_t non_finite = 0;
   std::size_t out_of_bounds = 0;
-  const double ground_range = GroundReturnRange();
-  const double ground_threshold =
-    std::isfinite(ground_range) ? ground_range * (1.0 - options_.ground_rejection_tolerance) :
-    std::numeric_limits<double>::infinity();
+
+  const double increment = frame.angle_increment > 0.0 ?
+    frame.angle_increment :
+    (spec_.max_angle - spec_.min_angle) /
+    static_cast<double>(std::max(1, spec_.samples - 1));
 
   std::vector<float> conditioned;
   conditioned.reserve(frame.ranges.size());
 
-  for (const float raw : frame.ranges) {
+  for (std::size_t index = 0; index < frame.ranges.size(); ++index) {
+    const float raw = frame.ranges[index];
     const double value = static_cast<double>(raw);
 
     if (!std::isfinite(value)) {
@@ -110,11 +137,24 @@ ValidationResult LidarValidator::Validate(
       continue;
     }
 
-    if (value >= ground_threshold) {
-      // Consistent with the floor ahead of a pitched chassis, not an obstacle.
-      ++ground_suppressed_;
-      conditioned.push_back(std::numeric_limits<float>::infinity());
-      continue;
+    // Floor rejection, per beam and BANDED. The old rule discarded everything
+    // beyond the predicted range, which is not "consistent with the floor" --
+    // it is "far away". A wall at 15 m is not floor, and deleting it every
+    // time the chassis pitched shredded the map.
+    //
+    // Geometrically a down-tilted beam terminates ON the floor at `range`; a
+    // return materially short of that is an obstacle standing on the floor,
+    // and one materially beyond it is impossible for that beam. So only the
+    // band around `range` is floor.
+    const double bearing = frame.angle_min + static_cast<double>(index) * increment;
+    const double range = GroundReturnRangeAt(bearing);
+    if (std::isfinite(range)) {
+      const double tolerance = options_.ground_rejection_tolerance;
+      if (value >= range * (1.0 - tolerance) && value <= range * (1.0 + tolerance)) {
+        ++ground_suppressed_;
+        conditioned.push_back(std::numeric_limits<float>::infinity());
+        continue;
+      }
     }
 
     conditioned.push_back(raw);

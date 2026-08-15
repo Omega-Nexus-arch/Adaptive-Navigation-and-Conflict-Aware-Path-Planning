@@ -71,6 +71,20 @@ heavy_mapper:
   yield_priority: 100
 
   # ---- Sensors -------------------------------------------------------------
+  # ---- Plant limits --------------------------------------------------------
+  # Ceiling the SIMULATED drivetrain accelerates at [m/s^2], linear. The xacro
+  # converts it to Gazebo's wheel angular limit by dividing by wheel_radius.
+  #
+  # Two independent jobs, and a plain multiple of max_accel_x only ever did
+  # the first:
+  #   1. sit above this model's own max_accel_x, so the acceleration profile
+  #      being demonstrated is the motion smoother's work, not the simulator
+  #      saturating;
+  #   2. sit above g*sin(theta) on the steepest ramp -- 1.53 m/s^2 at 9 deg --
+  #      or the robot cannot out-accelerate the slope it is parked on.
+  # Heavy and slow: 7x its own limit, 1.6x gravity on the steep ramp.
+  plant_accel_limit: 2.5
+
   # ---- Terrain ------------------------------------------------------------
   # Steepest grade this model accepts. Feeds amr_navigation's SlopeLayer: cost
   # rises from `base_cost` at the free angle to just below LETHAL here, so the
@@ -162,6 +176,20 @@ light_scout:
   safety_sector_half_angle: 1.3963   # +/- 80 deg guarded cone [rad]
 
   yield_priority: 50           # yields to the heavy mapper
+
+  # ---- Plant limits --------------------------------------------------------
+  # Ceiling the SIMULATED drivetrain accelerates at [m/s^2], linear. The xacro
+  # converts it to Gazebo's wheel angular limit by dividing by wheel_radius.
+  #
+  # Two independent jobs, and a plain multiple of max_accel_x only ever did
+  # the first:
+  #   1. sit above this model's own max_accel_x, so the acceleration profile
+  #      being demonstrated is the motion smoother's work, not the simulator
+  #      saturating;
+  #   2. sit above g*sin(theta) on the steepest ramp -- 1.53 m/s^2 at 9 deg --
+  #      or the robot cannot out-accelerate the slope it is parked on.
+  # Nimble: 4x its own limit, 2.9x gravity on the steep ramp.
+  plant_accel_limit: 4.4
 
   # ---- Terrain ------------------------------------------------------------
   # Steepest grade this model accepts. Feeds amr_navigation's SlopeLayer: cost

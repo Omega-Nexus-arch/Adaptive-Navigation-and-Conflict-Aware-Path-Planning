@@ -23,6 +23,7 @@ install(
     scripts/demo_safety_override.py
     scripts/demo_slope_planning.py
     scripts/check_model_consistency.py
+    scripts/run_goal_matrix.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

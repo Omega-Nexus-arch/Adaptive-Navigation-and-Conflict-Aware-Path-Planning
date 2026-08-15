@@ -23,6 +23,7 @@ Checks performed:
     ros2 run amr_bringup check_model_consistency.py
 """
 
+import math
 import os
 import sys
 
@@ -86,6 +87,15 @@ def main():
             notes.append(
                 f'{name}: scan plane {lidar_z:.2f} m clears the body top '
                 f'{deck_top:.2f} m by {lidar_z - deck_top:.2f} m')
+
+        # The simulated drivetrain has to out-accelerate the steepest ramp, or
+        # the robot stalls on it and slides back. See DESIGN_NOTES 8n.
+        plant = float(model.get('plant_accel_limit', 0.0))
+        if plant <= float(model['max_accel_x']):
+            problems.append(
+                f"{name}: plant_accel_limit {plant} m/s^2 is at or below the "
+                f"model's own {model['max_accel_x']} m/s^2, so Gazebo would be "
+                f"shaping the acceleration profile instead of the smoother")
 
         omega_limit = float(model['imu']['max_angular_velocity'])
         if omega_limit <= float(model['max_vel_theta']):
@@ -175,7 +185,17 @@ def main():
                 problems.append(
                     f"{name}: cannot climb the steepest ramp in the world "
                     f"({steepest:.1f} deg > {limit:.1f} deg limit)")
-        notes.append(f'world: steepest ramp {steepest:.1f} deg, all models can climb it')
+        gravity_pull = 9.81 * math.sin(math.radians(steepest))
+        for name, model in models.items():
+            plant = float(model.get('plant_accel_limit', 0.0))
+            if plant <= gravity_pull:
+                problems.append(
+                    f"{name}: plant_accel_limit {plant:.2f} m/s^2 cannot "
+                    f"out-accelerate gravity on the {steepest:.1f} deg ramp "
+                    f"({gravity_pull:.2f} m/s^2); it will stall and slide back")
+        notes.append(
+            f'world: steepest ramp {steepest:.1f} deg, all models can climb it '
+            f'and out-accelerate its {gravity_pull:.2f} m/s^2 pull')
     except Exception as error:   # noqa: BLE001 - advisory check only
         notes.append(f'world ramp check skipped: {error}')
 

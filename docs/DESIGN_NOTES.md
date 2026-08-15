@@ -124,15 +124,17 @@ validator feeds pitch into the LiDAR validator, and the LiDAR validator
 suppresses floor returns while the robot is on a slope:
 
 ```cpp
-// LidarValidator
-double GroundReturnRange() const {
-  const double pitch = std::abs(pitch_);
-  if (!options_.ground_rejection_enabled || pitch < options_.ground_rejection_pitch) {
-    return std::numeric_limits<double>::infinity();
-  }
-  return spec_.height / std::sin(pitch);
+// LidarValidator -- per beam, nose-down only, inside a forward arc
+double GroundReturnRangeAt(double bearing) const {
+  if (!enabled || pitch_ < options_.ground_rejection_pitch) return inf;
+  if (std::abs(wrap(bearing)) > options_.ground_rejection_arc) return inf;
+  const double tilt = std::sin(pitch_) * std::cos(bearing);
+  if (tilt <= kMinimumGroundTilt) return inf;
+  return spec_.height / tilt;
 }
 ```
+
+Three qualifiers, and each one was learned the hard way — see 8m and 8q.
 
 Two properties make it safe, both tested:
 
@@ -963,45 +965,52 @@ in opposite directions, and neither is a test.
 
 ---
 
-## 8i. A 0.9 m hole in a wall is not a route
+## 8i. A gap has to be drivable or absent, and I picked wrong twice
 
-The rack rows were built from 3.6 m segments with **0.9 m gaps** between them,
-on the reasonable-sounding theory that cross-aisles give the global planner
-route choices instead of a single corridor.
+The rack rows were built from 3.6 m bays with **0.9 m gaps**, meant as
+cross-aisles. The AMRs are **1.10 m** wide, so every gap was too narrow to
+drive through — and, critically, *not narrow enough for the costmap to write
+off*. The planner would occasionally thread a path through one, the robot would
+commit, and it would wedge.
 
-The AMRs are **1.10 m wide**. So every one of those gaps was too narrow to drive
-through -- and, critically, *not narrow enough for the costmap to write off*.
-Inflated by a 0.55 m radius the gap closes, but only just, and the planner would
-still occasionally thread a path through one. The robot would commit, enter, and
-wedge. That is the screenshot: an AMR nose-first between two racks.
+I named the rule correctly at the time — a gap must be either comfortably
+drivable or obviously closed — and then took the wrong branch. Closing them
+turned each row into 16 m of unbroken shelving, which removed the trap and
+created a worse problem:
 
-The failure is worth naming precisely, because "make the gap wider" and "make
-the gap narrower" are both correct fixes and the choice matters. A gap has to be
-either **comfortably drivable** or **obviously closed**; anything between the
-two is a trap that only fires sometimes, which is the worst kind. Widening every
-gap to 2 m would have turned the block into a grid with no through-route
-decisions left to make. So the rows are now **continuous**, and an aisle is
-entered around the end of a row -- which is how warehouse traffic actually
-works, and which gives the planner a real choice (*which end*) in place of a
-dozen false ones.
-
-**And `heavy_storage` moved with it.** The block went from three rows to two, so
-the goal sits in an aisle with exactly one row on each side rather than buried
-mid-block, and it moved to **(-15.0, -10.7)** -- deep enough that AMR-1 has to
-run the length of the block and turn in at the east mouth. The rows now reach
-x = -21.5, hard against the west wall, leaving 0.25 m: the aisle has one
-opening, so "go round" is not optional.
-
-| | before | after |
+| route | sealed rows | with 3.0 m cross-aisles |
 |---|---|---|
-| Rack row | 3.6 m bays, 0.9 m gaps | **continuous** |
-| Heavy block | 3 rows | **2 rows** |
-| `heavy_storage` | (-17.5, -10.7) | **(-15.0, -10.7)** |
-| Ways into the heavy aisle | ~10 unusable gaps | **1 mouth, 2.4 m wide** |
+| `dock_a` → `heavy_storage` | 32.6 m | **15.2 m** |
+| `dock_b` → `packing_bay_4` | 36.4 m | 36.4 m |
 
-Three tests hold it: no row may contain a gap between 0 and 1.9 m; the goal must
-lie between exactly two rows in a drivable aisle; and the west end must be too
-tight to squeeze through. All three fail on the old geometry.
+Reaching Heavy Storage meant driving the length of the block, round the end,
+and back — a 30 m journey to somewhere 14 m away, straight through the middle
+of the warehouse where all the traffic is. Ordinary point-to-point missions
+became fragile for no reason at all.
+
+The width was never a matter of taste. It is the same arithmetic that sizes the
+aisles:
+
+```
+gap >= 2 * inflation_radius + robot_width = 2 * 0.75 + 1.10 = 2.60 m
+```
+
+Below that there is no pose in the gap that costs nothing, so the planner has
+no reason to commit and every reason to hesitate. The rows now carry **3.0 m**
+cross-aisles — a 1.50 m cost-free lane — and every route in the warehouse is
+within 9% of its straight-line distance.
+
+`test_every_rack_gap_is_a_drivable_cross_aisle` asserts both halves: no gap
+narrower than 2.60 m, **and** at least one real gap somewhere. Butted bays are
+distinguished from traps, so "seal everything" fails with its own message
+rather than passing quietly. A second test requires the gaps in facing rows to
+line up, since a cross-aisle blocked on the far side is a lay-by.
+
+**The transferable lesson.** Stating a rule is not applying it. I wrote "either
+comfortably drivable or obviously closed" in this document, chose *closed*
+because it was the easy branch, and never checked what closed cost — because
+nothing measured route length. The check that would have caught it is the one
+that turns the prose into a number.
 
 ---
 
@@ -1098,11 +1107,284 @@ turning a fix into a property.
 
 ---
 
+## 8m. Ground rejection had no sign
+
+The IMU-informed ground-return rejection from section 3 was written like this:
+
+```cpp
+const double pitch = std::abs(pitch_);
+if (pitch < options_.ground_rejection_pitch) return infinity;
+return spec_.height / std::sin(pitch);
+```
+
+`std::abs` is wrong, and wrong in the direction that matters.
+
+REP-103's body frame is x forward, y left, z up, so a positive rotation about
++y tips x downward: **positive pitch is nose-down**. Nose-down is the
+descending case, the beam is aimed at the floor, and the returns really are
+floor. Nose-up -- climbing -- the beam is aimed *above* the floor and can never
+reach it. There is nothing to reject.
+
+Taking the magnitude collapsed the two cases, so a climbing robot still had
+everything past `h / sin(|pitch|)` deleted as "floor":
+
+| model | climbing | scan kept only to | of a scanner rated |
+|---|---|---|---|
+| heavy_mapper | 6.0° | 4.31 m | 25 m — **83% deleted** |
+| light_scout | 9.0° | 2.30 m | 16 m — **86% deleted** |
+
+So the moment either robot started up a ramp it lost the far walls, the deck
+edge ahead and the guard rails — the entire far field, at the point in the run
+where it is committed to a slope and most needs to see what it is climbing
+towards.
+
+The fix is one character class: test `pitch_`, not `std::abs(pitch_)`.
+
+**Why the existing test did not catch it.** `OnARampFloorReturnsAreSuppressed-
+ButObstaclesSurvive` sets one pitch value, positive, and asserts suppression
+happens. It is a good test of the descending case and says nothing at all about
+the other one — and because `abs()` made both cases identical, no amount of
+staring at the passing test would have revealed it. There are now three:
+climbing suppresses nothing, descending suppresses the floor, and a real
+obstacle at 1.5 m survives both. The middle one is the old behaviour, kept
+deliberately, so the fix cannot be "solved" by disabling the feature.
+
+**The transferable lesson.** `abs()` on a physical quantity is a claim that the
+sign carries no information. That claim is worth stating out loud when you write
+it, because it is often false and it is invisible afterwards — the code reads as
+if the author considered direction and concluded it did not matter, when in fact
+the question was never asked.
+
+---
+
+## 8n. rad/s² is not m/s²
+
+The scout kept stalling on the ramps. The cause is one missing division.
+
+`amr.gazebo.xacro` set the Gazebo diff-drive's acceleration ceiling like this:
+
+```xml
+<max_wheel_acceleration>${m['max_accel_x'] * 4.0}</max_wheel_acceleration>
+```
+
+`max_wheel_acceleration` is **wheel angular acceleration in rad/s²**.
+`max_accel_x` is **linear acceleration in m/s²**. Multiplying a linear figure
+by four and handing it over as an angular one gives a number that still looks
+entirely plausible, and is out by a factor of `1/r`:
+
+| model | ceiling set | which is | model's own limit | gravity on a 6° ramp |
+|---|---|---|---|---|
+| heavy_mapper | 1.40 rad/s² | **0.16 m/s²** | 0.35 m/s² | 1.03 m/s² |
+| light_scout | 4.40 rad/s² | **0.37 m/s²** | 1.10 m/s² | 1.03 m/s² |
+
+Neither robot could out-accelerate the slope it was standing on. Gravity pulls
+harder down the ramp than the drivetrain was permitted to push up it, so they
+crept, stalled and slid. The scout was worse because its wheels are smaller,
+and smaller wheels make a missing `1/r` bite harder — which is exactly
+backwards from the intuition that the light robot should climb more easily.
+
+**The fix found a second bug.** Dividing by the radius was necessary and not
+sufficient: the new guard immediately failed with
+
+```
+heavy_mapper: the plant tops out at 1.40 m/s^2 but gravity pulls it down
+the steepest ramp at 1.53 m/s^2. It cannot climb; it will stall and slide back.
+```
+
+A plant ceiling has **two independent requirements** and `max_accel_x × 4`
+only ever satisfied the first by construction:
+
+1. above the model's own `max_accel_x`, or Gazebo shapes the acceleration
+   profile and the motion-smoothing demo is measuring the simulator;
+2. above `g·sin θ` on the steepest ramp — 1.53 m/s² at 9° — or the robot
+   cannot climb at all.
+
+A multiplier satisfies the second only by luck, and for the heavy unit the luck
+had run out. So `plant_accel_limit` is now an explicit per-model number in
+`robot_models.yaml`: 2.5 m/s² for the mapper, 4.4 for the scout, both checked
+against both requirements by `check_model_consistency.py` before Gazebo starts.
+
+**The transferable lesson.** When a derived quantity changes units, the
+derivation is a claim that deserves a check, because the wrong answer is still
+a plausible-looking number. Nothing about `1.40` looks wrong. The only thing
+that catches it is asking what it has to be *bigger than* — and that question
+turned out to have two answers, not one.
+
+---
+
+## 8o. A person a scan line can miss
+
+The AMRs were driving straight through the pedestrians.
+
+The actors carried three collision spheres: two 0.22 m knees and a 0.40 m hip.
+A 2D LiDAR samples **exactly one height**, so whether a person was detected at
+all came down to whether that single plane happened to clip one of three
+spheres on a moving, animated skeleton. Sometimes it did. Mostly it did not.
+
+The column is now continuous from the floor to the chest — feet, knees, upper
+legs, hips, lower back — with the spans overlapping rather than merely stacked:
+
+| bone | radius | spans |
+|---|---|---|
+| feet | 0.20 | 0.00 – 0.40 m |
+| knees | 0.30 | 0.25 – 0.85 m |
+| upper legs | 0.30 | 0.65 – 1.25 m |
+| hips | 0.45 | 0.55 – 1.45 m |
+| lower back | 0.40 | 0.70 – 1.50 m |
+
+`test_a_human_is_solid_across_both_scan_planes` checks two things: that each
+robot's actual scan height falls inside some sphere, and that the column has no
+vertical gap at all — so a third robot with a different mast height cannot drop
+into a hole between two spheres. Reverting to the three-sphere version fails it.
+
+Human speeds also came down to a walking pace (0.40–0.65 m/s) after the
+`run.dae` animation made them look faster than the test needed.
+
+---
+
+## 8q. "Consistent with the floor" is not "far away"
+
+The scan came apart on ordinary missions: huge fan-shaped voids radiating from
+the robot, walls half-erased, the costmap raytracing free space through
+whatever had gone missing.
+
+Ground rejection was doing it, and there were **two** errors compounding.
+
+**One range for 1080 beams.** The predicted floor range `h / sin(pitch)` is
+only correct for a beam pointing straight ahead. A 360° scanner pitched
+nose-down by `p` tilts a beam at bearing `φ` by `sin(p)·cos(φ)`: full tilt
+ahead, none at 90°, and *upward* behind. The code computed the forward figure
+once and applied it to every beam.
+
+| bearing | effective tilt at 4° pitch | floor reached at |
+|---|---|---|
+| 0° | 4.00° | 8.60 m |
+| 60° | 2.00° | 17.20 m |
+| 90° | 0.00° | never |
+| 180° | −4.00° | never |
+
+So beams that could not touch the floor were being cleared as floor. That is
+the fan shape: the rear and side arcs erased wholesale.
+
+**Suppress-everything-beyond, rather than a band.** The rule was
+`value >= 0.75 × range`, i.e. *everything from there to infinity*. But a
+down-tilted beam terminates **on** the floor at `range`; a shorter return is an
+object standing on the floor and a longer one is geometrically impossible for
+that beam. "Beyond the predicted range" is not a description of floor, it is a
+description of *far away* — so every wall past 4.31 m disappeared each time the
+chassis pitched.
+
+Both are fixed: per-beam range, and a band of ±25% around it. Rejection is also
+confined to a **60° forward arc**, because outside it the tilt is so shallow
+that the predicted range runs out to tens of metres and stops being
+distinguishable from a distant wall. At that point suppressing is a guess, and
+guessing deletes real obstacles.
+
+**Why it appeared only now.** It was always wrong; it needed a trigger. The
+threshold is 0.06 rad (3.4°), chosen when the shallowest ramp was 7.8°. Fixing
+the plant acceleration ceiling (8n) let the chassis actually pitch under
+braking — and ordinary braking pitch now crosses 3.4°, so a bug that used to
+fire only on ramps started firing on flat ground. **A latent fault plus a
+correct fix is still a regression**, and there is no way to have known which
+without the numbers.
+
+`TheFarFieldSurvivesWhilePitched` fills the scan with a 15 m wall, pitches the
+robot 6°, and requires every beam to survive. It fails on either old behaviour.
+
+---
+
+## 8r. The one passage I never did the arithmetic for
+
+**Symptom.** Both robots stalled in the firewall doorway — "The Pinch" — on
+essentially every mission that crossed it. The user's report was pointed and
+correct: *"this was not happening before."*
+
+**Why it was not happening before.** I wrote a causal story here first —
+that an earlier fix had changed the inflation radius — and then checked it
+against `git log -S`. It was false: both the 2.00 m doorway and the
+`footprint_radius + 0.20` inflation formula date from the first commit and were
+never touched. So the geometry was marginal from day one and the fault was
+**latent**, not new.
+
+What plausibly surfaced it, in this order of confidence: the
+`plant_accel_limit` fix (8n) removed a de-facto speed cap, so the robots now
+arrive at the doorway at their real commanded speed instead of creeping;
+giving the pedestrians a continuous collision column (8o) put obstacles in the
+local costmap that the LiDAR previously passed straight through; and restoring
+the rack cross-aisles (8k) changed which routes cross the firewall at all. I
+have not isolated which one tipped it and I am not going to claim I did — the
+0.50 m band below is a defect regardless of what exposed it.
+
+The rule I had been using everywhere else is a single line of arithmetic: a
+robot has a **zero-cost** pose available only where it is more than
+`inflation_radius` from every obstacle, so a corridor of width `W` leaves a
+usable centre band of
+
+```
+band = W - 2 * inflation_radius
+```
+
+I used exactly this to widen the rack aisles from 2.40 m to 4.00 m (8k) and to
+size the rack cross-aisles at 3.00 m. I never once applied it to the doorway.
+
+At the time of the report:
+
+| | width | inflation | band |
+|---|---|---|---|
+| rack aisle | 4.00 m | 0.75 m | 2.50 m |
+| cross-aisle | 3.00 m | 0.75 m | 1.50 m |
+| **The Pinch** | **2.00 m** | **0.75 m** | **0.50 m** |
+
+A 0.50 m band means the controller had to hold the centreline to within 25 cm
+**while turning into the gap**. DWB would find no zero-cost rollout, take the
+least-bad one, overshoot, correct, and eventually trip the progress checker.
+
+**Two things were wrong, not one.**
+
+*The doorway was too narrow* — but widening alone breaks the scenario. The
+brief asks for a conflict-aware yielding protocol, and that protocol only ever
+fires because two robots cannot share this passage. Two robots hugging
+opposite walls of a `W`-wide doorway sit `W - r_a - r_b` apart, and the
+detector flags them at `r_a + r_b + conflict_margin` = 1.27 m. So:
+
+```
+W < 1.27 + 0.55 + 0.37 = 2.19 m   or the yield never fires
+```
+
+*The inflation radius was too large* — and this is the real culprit. 0.75 m on
+a robot whose **inscribed radius is 0.55 m** is 0.20 m of pure padding. The
+inscribed radius is what actually prevents collisions: nav2 marks everything
+inside it as lethal-equivalent and no planner will cross it. `inflation_radius`
+only controls how far a *decaying* cost extends beyond that, and 0.20 m of it
+was enough to make a legal doorway carry cost at every pose inside it.
+
+**Fix.** Doorway 2.00 → **2.10 m**, inflation padding 0.20 → **0.05 m**. Band
+goes 0.50 → 0.90 m, and 2.10 m is still under the 2.19 m yield bound. Collision
+safety is unchanged, because the inscribed radius did not move.
+
+Also `vtheta_samples` 20 → 40. Over ±1.5 rad/s, 20 samples is 0.15 rad/s of
+granularity — coarse enough that even with a usable band there may be no
+sampled trajectory that threads the gap.
+
+**Guard.** `test_pinch_admits_one_robot_but_not_two` now asserts both bounds,
+and reads the radii, the inflation padding and `conflict_margin` from
+`fleet_loader` rather than keeping its own copies. Its two hardcoded constants
+were correct when written and silently stale afterwards, which is precisely the
+failure this note is about. Reverting the doorway, reverting the padding, and
+over-widening the doorway each fail it, in the right direction.
+
+**What I would take from this.** The bug was not that I did not know the rule.
+I wrote the rule, in this file, and then applied it to three passages and not
+the fourth — the busiest one. The lesson is that a rule stated in prose gets
+skipped; the same rule expressed as a test over *every* passage does not. The
+guard now derives its inputs, so the next time the padding changes the doorway
+is re-checked whether or not I remember to.
+
 ## 9. What I would do next
 
 Honest gaps, roughly in the order I would close them.
 
-1. **Integration tests under `launch_testing`.** The 268 automated tests cover the
+1. **Integration tests under `launch_testing`.** The 274 automated tests cover the
    algorithms thoroughly and the node wiring not at all. A `launch_testing`
    suite that brings up two robots headless and asserts on `/cmd_vel` and
    `/fleet/traffic_directives` would cover the seam between them.

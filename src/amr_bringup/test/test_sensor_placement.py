@@ -31,6 +31,7 @@ below are derived from ``robot_models.yaml``, so a new model is covered the
 moment it is added.
 """
 
+import math
 import os
 
 import yaml
@@ -146,6 +147,131 @@ def test_slam_uses_the_scanners_real_range():
         assert f"'{key}'" in source, (
             f'{key} must be rewritten per robot from robot_models.yaml, or the '
             f'two scanner models share one hardcoded range')
+
+
+#: Gravity [m/s^2].
+GRAVITY = 9.81
+
+
+def steepest_ramp_degrees():
+    """The steepest gradient the fleet is expected to climb."""
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(SRC, 'amr_gazebo'))
+    from amr_gazebo import world_builder as wb
+    return max(r.slope_deg for r in wb.build_warehouse().ramps)
+
+
+def test_the_plant_can_out_accelerate_the_steepest_ramp():
+    """`<max_wheel_acceleration>` is angular; `max_accel_x` is linear.
+
+    The URDF used to set the Gazebo diff-drive's ceiling to
+    ``max_accel_x * 4.0`` with no division by wheel radius. rad/s^2 and m/s^2
+    are not the same units, and the mistake is invisible because the number
+    still looks plausible: the heavy unit's ceiling came out at 1.40 rad/s^2,
+    which is **0.16 m/s^2** of linear acceleration -- less than half the
+    0.35 m/s^2 the model itself declares, and well under the 1.03 m/s^2 that
+    gravity pulls a robot down a 6 degree ramp.
+
+    Neither robot could out-accelerate the slope it was standing on, so both
+    stalled on the ramps. The scout stalled hardest because its wheels are
+    smaller, which makes the missing division bite harder.
+    """
+    path = os.path.join(SRC, 'amr_description', 'urdf', 'amr.gazebo.xacro')
+    with open(path, 'r', encoding='utf-8') as handle:
+        source = handle.read()
+    assert "m['wheel_radius']" in source.split('<max_wheel_acceleration>')[1], (
+        'max_wheel_acceleration is in rad/s^2; deriving it from a linear '
+        'acceleration without dividing by the wheel radius understates it by '
+        'a factor of 1/r'
+    )
+
+    slope = math.radians(steepest_ramp_degrees())
+    demanded = GRAVITY * math.sin(slope)
+
+    for name, model in models().items():
+        linear = float(model['plant_accel_limit'])
+        assert linear > demanded, (
+            f'{name}: the plant tops out at {linear:.2f} m/s^2 but gravity '
+            f'pulls it down the steepest ramp at {demanded:.2f} m/s^2. It '
+            f'cannot climb; it will stall and slide back.'
+        )
+        assert linear >= model['max_accel_x'], (
+            f'{name}: the plant ceiling {linear:.2f} m/s^2 is below the '
+            f"model's own {model['max_accel_x']} m/s^2, so the simulator -- "
+            f'not the motion smoother -- would be shaping the acceleration '
+            f'profile, and the smoothing demo would be measuring Gazebo'
+        )
+
+
+def test_a_human_is_solid_across_both_scan_planes():
+    """The AMRs were driving through the pedestrians.
+
+    An actor's collisions are per-bone spheres. A 2D LiDAR samples exactly one
+    height, so with only knees and hips declared, whether a person was seen at
+    all came down to whether that single plane happened to clip a sphere. The
+    column now overlaps continuously from the feet to the chest.
+    """
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(SRC, 'amr_gazebo'))
+    from amr_gazebo import world_builder as wb
+
+    #: Approximate bone heights on the 1.8 m skeleton [m].
+    heights = {
+        'LeftFoot': 0.20, 'RightFoot': 0.20,
+        'LeftLeg': 0.55, 'RightLeg': 0.55,
+        'LeftUpLeg': 0.95, 'RightUpLeg': 0.95,
+        'Hips': 1.00, 'LowerBack': 1.10,
+    }
+    bones = wb.HUMAN_BONE_COLLISIONS
+    assert set(bones) <= set(heights), f'unknown bone in {set(bones) - set(heights)}'
+
+    # Every scan plane either robot uses must fall inside some sphere.
+    for name, model in models().items():
+        plane = float(model['lidar']['height'])
+        hit = [b for b, r in bones.items() if abs(plane - heights[b]) <= r]
+        assert hit, (
+            f'{name} scans at {plane} m and no collision sphere spans that '
+            f'height, so its LiDAR passes straight through a pedestrian'
+        )
+
+    # And the column must be continuous, or a taller robot added later drops
+    # into a gap between two spheres.
+    spans = sorted((heights[b] - r, heights[b] + r) for b, r in bones.items())
+    reach = spans[0][1]
+    for low, high in spans[1:]:
+        assert low <= reach + 1e-9, (
+            f'the collision column has a gap between {reach:.2f} m and '
+            f'{low:.2f} m; a scan plane there would see nothing'
+        )
+        reach = max(reach, high)
+    assert spans[0][0] <= 0.05, 'the column should start at the floor'
+    assert reach >= 1.4, 'the column should reach at least chest height'
+
+
+def test_no_xacro_comment_contains_a_double_hyphen():
+    """`--` is illegal inside an XML comment, and xacro will not load the file.
+
+    Easy to write by accident when a comment explains a subtraction or uses a
+    dash as punctuation, and the failure is a parser error a long way from the
+    prose that caused it.
+    """
+    import glob
+    import re
+
+    urdf = os.path.join(SRC, 'amr_description', 'urdf')
+    files = glob.glob(os.path.join(urdf, '*.xacro'))
+    assert files, 'expected some xacro files'
+
+    for path in files:
+        with open(path, 'r', encoding='utf-8') as handle:
+            text = handle.read()
+        for comment in re.findall(r'<!--.*?-->', text, re.S):
+            inner = comment[4:-3]
+            assert '--' not in inner, (
+                f'{os.path.basename(path)}: an XML comment contains "--", which '
+                f'makes the file unparseable:\n    ...'
+                f'{inner[max(0, inner.find("--") - 40):inner.find("--") + 40]}...'
+            )
 
 
 def test_every_model_is_covered_by_these_checks():

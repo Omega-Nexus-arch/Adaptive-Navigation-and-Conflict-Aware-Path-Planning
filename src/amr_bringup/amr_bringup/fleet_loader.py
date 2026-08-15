@@ -350,7 +350,14 @@ def nav2_substitutions(robot, global_frame, elevation_map_path):
     return {
         'use_sim_time': 'True',
         'robot_radius': str(footprint_radius),
-        'inflation_radius': str(round(footprint_radius + 0.20, 3)),
+        # Padding of 0.05 m, not 0.20 m. The hard constraint is the INSCRIBED
+        # radius -- nav2 marks everything within it as lethal-equivalent, and
+        # that is what prevents collisions. `inflation_radius` only sets how far
+        # a decaying cost extends beyond it, and 0.20 m of extra padding on a
+        # 0.55 m robot meant a legal 2.0 m doorway carried cost at every single
+        # pose inside it: the controller had nowhere free to aim, so it hunted
+        # and stalled. See DESIGN_NOTES 8r.
+        'inflation_radius': str(round(footprint_radius + 0.05, 3)),
         'inscribed_radius': str(inscribed),
         'max_vel_x': str(max_vel_x),
         'min_vel_x': str(float(model.get('min_vel_x', -0.4))),

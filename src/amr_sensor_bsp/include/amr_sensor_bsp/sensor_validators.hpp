@@ -64,6 +64,10 @@ struct LidarFrame
 /// This is the reason the BSP layer is worth building rather than
 /// stubbing: it is the only place that has both the raw scan and the validated
 /// attitude, and the fix needs both.
+/// Beams tilted less than this toward the floor are treated as level: the
+/// predicted range explodes and the arithmetic stops meaning anything.
+inline constexpr double kMinimumGroundTilt = 1e-3;
+
 class LidarValidator : public SensorValidator
 {
 public:
@@ -77,12 +81,20 @@ public:
     double staleness_seconds = 0.5;
     /// Enable IMU-informed ground-return rejection.
     bool ground_rejection_enabled = true;
-    /// Pitch magnitude beyond which rejection engages [rad]. Below it the
-    /// beam reaches far enough that ground returns are out of range anyway.
+    /// NOSE-DOWN pitch beyond which rejection engages [rad]. Signed, not a
+    /// magnitude: nose-up means the beam is aimed above the floor and there is
+    /// nothing to reject. Below this the beam reaches far enough that ground
+    /// returns are out of range anyway.
     double ground_rejection_pitch = 0.06;
     /// Returns within this fraction of the predicted ground range are treated
     /// as floor.
     double ground_rejection_tolerance = 0.25;
+    /// Half-angle of the forward arc within which floor rejection applies
+    /// [rad]. Outside it the beam is barely tilted, so its predicted floor
+    /// range runs off to tens of metres and becomes indistinguishable from a
+    /// distant wall -- at which point suppressing is a guess, and guessing
+    /// deletes real obstacles. 60 degrees.
+    double ground_rejection_arc = 1.0472;
   };
 
   LidarValidator(const amr_core::LidarSpec & spec, const Options & options);
@@ -102,7 +114,14 @@ public:
 
   /// \brief Predicted range at which the beam meets the floor, or infinity
   ///        when the robot is level enough that it does not.
+  /// \brief Predicted floor range straight ahead [m], or inf if none.
   double GroundReturnRange() const;
+
+  /// \brief Predicted floor range for a beam at \p bearing [m].
+  ///
+  /// Infinite when that beam is level or aimed above the horizon, which is
+  /// most of a 360 degree scan even on a steep ramp.
+  double GroundReturnRangeAt(double bearing) const;
 
   /// \brief Number of returns suppressed as floor by the most recent call.
   std::uint32_t LastGroundReturnsSuppressed() const {return ground_suppressed_;}

@@ -143,16 +143,16 @@
 
     <model name="heavy_rack_0_0">
       <static>true</static>
-      <pose>-19.8500 -14.0000 1.2000 0 0 0.000000</pose>
+      <pose>-19.7500 -14.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -166,16 +166,16 @@
 
     <model name="heavy_rack_0_1">
       <static>true</static>
-      <pose>-16.5500 -14.0000 1.2000 0 0 0.000000</pose>
+      <pose>-13.2500 -14.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -189,62 +189,16 @@
 
     <model name="heavy_rack_0_2">
       <static>true</static>
-      <pose>-13.2500 -14.0000 1.2000 0 0 0.000000</pose>
+      <pose>-6.7500 -14.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="heavy_rack_0_3">
-      <static>true</static>
-      <pose>-9.9500 -14.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="heavy_rack_0_4">
-      <static>true</static>
-      <pose>-6.6500 -14.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -258,16 +212,16 @@
 
     <model name="heavy_rack_1_0">
       <static>true</static>
-      <pose>-19.8500 -9.0000 1.2000 0 0 0.000000</pose>
+      <pose>-19.7500 -9.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -281,16 +235,16 @@
 
     <model name="heavy_rack_1_1">
       <static>true</static>
-      <pose>-16.5500 -9.0000 1.2000 0 0 0.000000</pose>
+      <pose>-13.2500 -9.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -304,62 +258,16 @@
 
     <model name="heavy_rack_1_2">
       <static>true</static>
-      <pose>-13.2500 -9.0000 1.2000 0 0 0.000000</pose>
+      <pose>-6.7500 -9.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="heavy_rack_1_3">
-      <static>true</static>
-      <pose>-9.9500 -9.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="heavy_rack_1_4">
-      <static>true</static>
-      <pose>-6.6500 -9.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.3000 1.0000 2.4000</size></box>
+            <box><size>3.5000 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -373,16 +281,16 @@
 
     <model name="general_rack_0_0">
       <static>true</static>
-      <pose>-19.6875 7.0000 1.2000 0 0 0.000000</pose>
+      <pose>-18.6250 7.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
+            <box><size>5.7500 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
+            <box><size>5.7500 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -396,62 +304,16 @@
 
     <model name="general_rack_0_1">
       <static>true</static>
-      <pose>-16.0625 7.0000 1.2000 0 0 0.000000</pose>
+      <pose>-9.8750 7.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
+            <box><size>5.7500 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="general_rack_0_2">
-      <static>true</static>
-      <pose>-12.4375 7.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="general_rack_0_3">
-      <static>true</static>
-      <pose>-8.8125 7.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
+            <box><size>5.7500 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -465,16 +327,16 @@
 
     <model name="general_rack_1_0">
       <static>true</static>
-      <pose>-19.6875 12.0000 1.2000 0 0 0.000000</pose>
+      <pose>-18.6250 12.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
+            <box><size>5.7500 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
+            <box><size>5.7500 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -488,62 +350,16 @@
 
     <model name="general_rack_1_1">
       <static>true</static>
-      <pose>-16.0625 12.0000 1.2000 0 0 0.000000</pose>
+      <pose>-9.8750 12.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
+            <box><size>5.7500 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="general_rack_1_2">
-      <static>true</static>
-      <pose>-12.4375 12.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="general_rack_1_3">
-      <static>true</static>
-      <pose>-8.8125 12.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.6250 1.0000 2.4000</size></box>
+            <box><size>5.7500 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -557,16 +373,16 @@
 
     <model name="buffer_rack_0_0">
       <static>true</static>
-      <pose>6.6250 -14.0000 1.2000 0 0 0.000000</pose>
+      <pose>7.5000 -14.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
+            <box><size>5.0000 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
+            <box><size>5.0000 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -580,62 +396,16 @@
 
     <model name="buffer_rack_0_1">
       <static>true</static>
-      <pose>9.8750 -14.0000 1.2000 0 0 0.000000</pose>
+      <pose>15.5000 -14.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
+            <box><size>5.0000 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="buffer_rack_0_2">
-      <static>true</static>
-      <pose>13.1250 -14.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="buffer_rack_0_3">
-      <static>true</static>
-      <pose>16.3750 -14.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
+            <box><size>5.0000 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -649,16 +419,16 @@
 
     <model name="buffer_rack_1_0">
       <static>true</static>
-      <pose>6.6250 -9.0000 1.2000 0 0 0.000000</pose>
+      <pose>7.5000 -9.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
+            <box><size>5.0000 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
+            <box><size>5.0000 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -672,62 +442,16 @@
 
     <model name="buffer_rack_1_1">
       <static>true</static>
-      <pose>9.8750 -9.0000 1.2000 0 0 0.000000</pose>
+      <pose>15.5000 -9.0000 1.2000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
+            <box><size>5.0000 1.0000 2.4000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="buffer_rack_1_2">
-      <static>true</static>
-      <pose>13.1250 -9.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
-          </geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Wood</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="buffer_rack_1_3">
-      <static>true</static>
-      <pose>16.3750 -9.0000 1.2000 0 0 0.000000</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>3.2500 1.0000 2.4000</size></box>
+            <box><size>5.0000 1.0000 2.4000</size></box>
           </geometry>
           <material>
             <script>
@@ -741,16 +465,16 @@
 
     <model name="firewall_south">
       <static>true</static>
-      <pose>0.0000 -7.9500 1.5000 0 0 0.000000</pose>
+      <pose>0.0000 -7.9750 1.5000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>0.4000 13.9000 3.0000</size></box>
+            <box><size>0.4000 13.8500 3.0000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>0.4000 13.9000 3.0000</size></box>
+            <box><size>0.4000 13.8500 3.0000</size></box>
           </geometry>
           <material>
             <script>
@@ -764,16 +488,16 @@
 
     <model name="firewall_mid">
       <static>true</static>
-      <pose>0.0000 1.5000 1.5000 0 0 0.000000</pose>
+      <pose>0.0000 1.5250 1.5000 0 0 0.000000</pose>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <box><size>0.4000 1.0000 3.0000</size></box>
+            <box><size>0.4000 0.9500 3.0000</size></box>
           </geometry>
         </collision>
         <visual name="visual">
           <geometry>
-            <box><size>0.4000 1.0000 3.0000</size></box>
+            <box><size>0.4000 0.9500 3.0000</size></box>
           </geometry>
           <material>
             <script>
@@ -1290,29 +1014,54 @@
         <delay_start>0</delay_start>
         <auto_start>true</auto_start>
         <trajectory id="0" type="run">
-          <waypoint><time>0.000</time><pose>-14.0000 1.0000 0 0 0 1.5708</pose></waypoint>
-          <waypoint><time>0.700</time><pose>-14.0000 1.0000 0 0 0 0.0000</pose></waypoint>
-          <waypoint><time>6.256</time><pose>-9.0000 1.0000 0 0 0 0.0000</pose></waypoint>
-          <waypoint><time>6.956</time><pose>-9.0000 1.0000 0 0 0 -1.5708</pose></waypoint>
-          <waypoint><time>10.289</time><pose>-9.0000 -2.0000 0 0 0 -1.5708</pose></waypoint>
-          <waypoint><time>10.989</time><pose>-9.0000 -2.0000 0 0 0 3.1416</pose></waypoint>
-          <waypoint><time>16.544</time><pose>-14.0000 -2.0000 0 0 0 3.1416</pose></waypoint>
-          <waypoint><time>17.244</time><pose>-14.0000 -2.0000 0 0 0 1.5708</pose></waypoint>
-          <waypoint><time>20.578</time><pose>-14.0000 1.0000 0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>0.000</time><pose>-6.6000 5.0000 0 0 0 0.0000</pose></waypoint>
+          <waypoint><time>0.700</time><pose>-6.6000 5.0000 0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>18.882</time><pose>-6.6000 -5.0000 0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>19.582</time><pose>-6.6000 -5.0000 0 0 0 3.1416</pose></waypoint>
+          <waypoint><time>33.945</time><pose>-14.5000 -5.0000 0 0 0 3.1416</pose></waypoint>
+          <waypoint><time>34.645</time><pose>-14.5000 -5.0000 0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>52.827</time><pose>-14.5000 5.0000 0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>53.527</time><pose>-14.5000 5.0000 0 0 0 0.0000</pose></waypoint>
+          <waypoint><time>67.891</time><pose>-6.6000 5.0000 0 0 0 0.0000</pose></waypoint>
         </trajectory>
       </script>
+      <link name="LeftFoot">
+        <collision name="LeftFoot_collision">
+          <geometry><sphere><radius>0.200</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="RightFoot">
+        <collision name="RightFoot_collision">
+          <geometry><sphere><radius>0.200</radius></sphere></geometry>
+        </collision>
+      </link>
       <link name="LeftLeg">
         <collision name="LeftLeg_collision">
-          <geometry><sphere><radius>0.220</radius></sphere></geometry>
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightLeg">
         <collision name="RightLeg_collision">
-          <geometry><sphere><radius>0.220</radius></sphere></geometry>
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="LeftUpLeg">
+        <collision name="LeftUpLeg_collision">
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="RightUpLeg">
+        <collision name="RightUpLeg_collision">
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="Hips">
         <collision name="Hips_collision">
+          <geometry><sphere><radius>0.450</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="LowerBack">
+        <collision name="LowerBack_collision">
           <geometry><sphere><radius>0.400</radius></sphere></geometry>
         </collision>
       </link>
@@ -1335,27 +1084,52 @@
         <trajectory id="0" type="run">
           <waypoint><time>0.000</time><pose>-5.0000 7.8000 0 0 0 -1.5708</pose></waypoint>
           <waypoint><time>0.700</time><pose>-5.0000 7.8000 0 0 0 0.0000</pose></waypoint>
-          <waypoint><time>3.367</time><pose>-3.0000 7.8000 0 0 0 0.0000</pose></waypoint>
-          <waypoint><time>4.067</time><pose>-3.0000 7.8000 0 0 0 1.5708</pose></waypoint>
-          <waypoint><time>9.933</time><pose>-3.0000 12.2000 0 0 0 1.5708</pose></waypoint>
-          <waypoint><time>10.633</time><pose>-3.0000 12.2000 0 0 0 3.1416</pose></waypoint>
-          <waypoint><time>13.300</time><pose>-5.0000 12.2000 0 0 0 3.1416</pose></waypoint>
-          <waypoint><time>14.000</time><pose>-5.0000 12.2000 0 0 0 -1.5708</pose></waypoint>
-          <waypoint><time>19.867</time><pose>-5.0000 7.8000 0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>5.144</time><pose>-3.0000 7.8000 0 0 0 0.0000</pose></waypoint>
+          <waypoint><time>5.844</time><pose>-3.0000 7.8000 0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>15.622</time><pose>-3.0000 12.2000 0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>16.322</time><pose>-3.0000 12.2000 0 0 0 3.1416</pose></waypoint>
+          <waypoint><time>20.767</time><pose>-5.0000 12.2000 0 0 0 3.1416</pose></waypoint>
+          <waypoint><time>21.467</time><pose>-5.0000 12.2000 0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>31.244</time><pose>-5.0000 7.8000 0 0 0 -1.5708</pose></waypoint>
         </trajectory>
       </script>
+      <link name="LeftFoot">
+        <collision name="LeftFoot_collision">
+          <geometry><sphere><radius>0.200</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="RightFoot">
+        <collision name="RightFoot_collision">
+          <geometry><sphere><radius>0.200</radius></sphere></geometry>
+        </collision>
+      </link>
       <link name="LeftLeg">
         <collision name="LeftLeg_collision">
-          <geometry><sphere><radius>0.220</radius></sphere></geometry>
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightLeg">
         <collision name="RightLeg_collision">
-          <geometry><sphere><radius>0.220</radius></sphere></geometry>
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="LeftUpLeg">
+        <collision name="LeftUpLeg_collision">
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="RightUpLeg">
+        <collision name="RightUpLeg_collision">
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="Hips">
         <collision name="Hips_collision">
+          <geometry><sphere><radius>0.450</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="LowerBack">
+        <collision name="LowerBack_collision">
           <geometry><sphere><radius>0.400</radius></sphere></geometry>
         </collision>
       </link>
@@ -1378,27 +1152,52 @@
         <trajectory id="0" type="run">
           <waypoint><time>0.000</time><pose>5.5000 -1.2000 0 0 0 1.5708</pose></waypoint>
           <waypoint><time>0.700</time><pose>5.5000 -1.2000 0 0 0 0.0000</pose></waypoint>
-          <waypoint><time>7.843</time><pose>13.0000 -1.2000 0 0 0 0.0000</pose></waypoint>
-          <waypoint><time>8.543</time><pose>13.0000 -1.2000 0 0 0 -1.5708</pose></waypoint>
-          <waypoint><time>10.448</time><pose>13.0000 -3.2000 0 0 0 -1.5708</pose></waypoint>
-          <waypoint><time>11.148</time><pose>13.0000 -3.2000 0 0 0 3.1416</pose></waypoint>
-          <waypoint><time>18.290</time><pose>5.5000 -3.2000 0 0 0 3.1416</pose></waypoint>
-          <waypoint><time>18.990</time><pose>5.5000 -3.2000 0 0 0 1.5708</pose></waypoint>
-          <waypoint><time>20.895</time><pose>5.5000 -1.2000 0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>12.238</time><pose>13.0000 -1.2000 0 0 0 0.0000</pose></waypoint>
+          <waypoint><time>12.938</time><pose>13.0000 -1.2000 0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>16.015</time><pose>13.0000 -3.2000 0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>16.715</time><pose>13.0000 -3.2000 0 0 0 3.1416</pose></waypoint>
+          <waypoint><time>28.254</time><pose>5.5000 -3.2000 0 0 0 3.1416</pose></waypoint>
+          <waypoint><time>28.954</time><pose>5.5000 -3.2000 0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>32.031</time><pose>5.5000 -1.2000 0 0 0 1.5708</pose></waypoint>
         </trajectory>
       </script>
+      <link name="LeftFoot">
+        <collision name="LeftFoot_collision">
+          <geometry><sphere><radius>0.200</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="RightFoot">
+        <collision name="RightFoot_collision">
+          <geometry><sphere><radius>0.200</radius></sphere></geometry>
+        </collision>
+      </link>
       <link name="LeftLeg">
         <collision name="LeftLeg_collision">
-          <geometry><sphere><radius>0.220</radius></sphere></geometry>
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightLeg">
         <collision name="RightLeg_collision">
-          <geometry><sphere><radius>0.220</radius></sphere></geometry>
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="LeftUpLeg">
+        <collision name="LeftUpLeg_collision">
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="RightUpLeg">
+        <collision name="RightUpLeg_collision">
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="Hips">
         <collision name="Hips_collision">
+          <geometry><sphere><radius>0.450</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="LowerBack">
+        <collision name="LowerBack_collision">
           <geometry><sphere><radius>0.400</radius></sphere></geometry>
         </collision>
       </link>
@@ -1421,77 +1220,56 @@
         <trajectory id="0" type="run">
           <waypoint><time>0.000</time><pose>11.0000 2.5000 0 0 0 1.5708</pose></waypoint>
           <waypoint><time>0.700</time><pose>11.0000 2.5000 0 0 0 0.0000</pose></waypoint>
-          <waypoint><time>5.700</time><pose>14.0000 2.5000 0 0 0 0.0000</pose></waypoint>
-          <waypoint><time>6.400</time><pose>14.0000 2.5000 0 0 0 -1.5708</pose></waypoint>
-          <waypoint><time>9.733</time><pose>14.0000 0.5000 0 0 0 -1.5708</pose></waypoint>
-          <waypoint><time>10.433</time><pose>14.0000 0.5000 0 0 0 3.1416</pose></waypoint>
-          <waypoint><time>15.433</time><pose>11.0000 0.5000 0 0 0 3.1416</pose></waypoint>
-          <waypoint><time>16.133</time><pose>11.0000 0.5000 0 0 0 1.5708</pose></waypoint>
-          <waypoint><time>19.467</time><pose>11.0000 2.5000 0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>8.200</time><pose>14.0000 2.5000 0 0 0 0.0000</pose></waypoint>
+          <waypoint><time>8.900</time><pose>14.0000 2.5000 0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>13.900</time><pose>14.0000 0.5000 0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>14.600</time><pose>14.0000 0.5000 0 0 0 3.1416</pose></waypoint>
+          <waypoint><time>22.100</time><pose>11.0000 0.5000 0 0 0 3.1416</pose></waypoint>
+          <waypoint><time>22.800</time><pose>11.0000 0.5000 0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>27.800</time><pose>11.0000 2.5000 0 0 0 1.5708</pose></waypoint>
         </trajectory>
       </script>
+      <link name="LeftFoot">
+        <collision name="LeftFoot_collision">
+          <geometry><sphere><radius>0.200</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="RightFoot">
+        <collision name="RightFoot_collision">
+          <geometry><sphere><radius>0.200</radius></sphere></geometry>
+        </collision>
+      </link>
       <link name="LeftLeg">
         <collision name="LeftLeg_collision">
-          <geometry><sphere><radius>0.220</radius></sphere></geometry>
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightLeg">
         <collision name="RightLeg_collision">
-          <geometry><sphere><radius>0.220</radius></sphere></geometry>
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="LeftUpLeg">
+        <collision name="LeftUpLeg_collision">
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="RightUpLeg">
+        <collision name="RightUpLeg_collision">
+          <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="Hips">
         <collision name="Hips_collision">
+          <geometry><sphere><radius>0.450</radius></sphere></geometry>
+        </collision>
+      </link>
+      <link name="LowerBack">
+        <collision name="LowerBack_collision">
           <geometry><sphere><radius>0.400</radius></sphere></geometry>
         </collision>
       </link>
     </actor>
-
-    <model name="thirdparty_0">
-      <pose>-3.5000 -5.0000 0.2500 0 0 0</pose>
-      <link name="link">
-        <inertial>
-          <mass>40.00</mass>
-          <inertia>
-            <ixx>0.8333</ixx><ixy>0</ixy><ixz>0</ixz>
-            <iyy>0.8333</iyy><iyz>0</iyz>
-            <izz>4.0500</izz>
-          </inertia>
-        </inertial>
-        <collision name="collision">
-          <geometry><box><size>0.900 0.900 0.500</size></box></geometry>
-        </collision>
-        <visual name="visual">
-          <geometry><box><size>0.900 0.900 0.500</size></box></geometry>
-          <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Red</name>
-            </script>
-          </material>
-        </visual>
-      </link>
-
-      <!-- Holonomic drive so dynamic_obstacle_driver can steer it with a
-           plain Twist. Odometry is namespaced to keep the fleet TF tree
-           clean. -->
-      <plugin name="thirdparty_0_move" filename="libgazebo_ros_planar_move.so">
-        <ros>
-          <namespace>/obstacles/thirdparty_0</namespace>
-          <remapping>cmd_vel:=cmd_vel</remapping>
-          <remapping>odom:=odom</remapping>
-        </ros>
-        <update_rate>50</update_rate>
-        <publish_rate>10</publish_rate>
-        <publish_odom>true</publish_odom>
-        <publish_odom_tf>false</publish_odom_tf>
-        <odometry_frame>obstacles/thirdparty_0/odom</odometry_frame>
-        <robot_base_frame>obstacles/thirdparty_0/base_link</robot_base_frame>
-        <covariance_x>0.0001</covariance_x>
-        <covariance_y>0.0001</covariance_y>
-        <covariance_yaw>0.01</covariance_yaw>
-      </plugin>
-    </model>
 
     <model name="thirdparty_1">
       <pose>5.5000 -5.0000 0.2500 0 0 0</pose>

@@ -227,29 +227,90 @@ TEST(LidarValidatorTest, LevelRobotSuppressesNothing) {
 }
 
 TEST(LidarValidatorTest, OnARampFloorReturnsAreSuppressedButObstaclesSurvive) {
-  // The scenario that would otherwise make the ramps impassable: at 8.7
-  // degrees the 0.42 m LiDAR meets the floor at 0.42 / sin(8.7 deg) = 2.78 m.
-  // A phantom wall there closes the ramp in the costmap and quietly
-  // invalidates the whole slope-cost experiment.
+  // The scenario that would otherwise make the ramps impassable: a phantom
+  // wall across the ramp closes it in the costmap and quietly invalidates the
+  // whole slope-cost experiment.
+  //
+  // Each beam gets ITS OWN predicted floor range. A 360 degree scanner pitched
+  // nose-down only aims at the floor ahead; sideways beams are level and rear
+  // beams point up, and none of those can produce a ground return.
   LidarValidator validator(HeavyLidarSpec(), {});
-  const double pitch = 8.7 * M_PI / 180.0;
+  const double pitch = 6.0 * M_PI / 180.0;
   validator.SetPitch(pitch);
 
-  const double expected_ground = 0.42 / std::sin(pitch);
-  EXPECT_NEAR(validator.GroundReturnRange(), expected_ground, 0.05);
+  const amr_core::LidarSpec spec = HeavyLidarSpec();
+  const double increment =
+    (spec.max_angle - spec.min_angle) / static_cast<double>(spec.samples - 1);
 
-  LidarFrame frame = HealthyScan(static_cast<float>(expected_ground));
-  // One genuine obstacle much closer than the floor return.
-  frame.ranges[180] = 1.0f;
+  LidarFrame frame = HealthyScan(5.0);
+  std::size_t floor_beams = 0;
+  for (int i = 0; i < spec.samples; ++i) {
+    const double bearing = spec.min_angle + i * increment;
+    const double range = validator.GroundReturnRangeAt(bearing);
+    if (std::isfinite(range) && range < spec.range_max) {
+      frame.ranges[i] = static_cast<float>(range);
+      ++floor_beams;
+    }
+  }
+  ASSERT_GT(floor_beams, 50u) << "expected a forward arc of floor returns";
+
+  // One genuine obstacle dead ahead, much closer than the floor line.
+  const int ahead = spec.samples / 2;
+  frame.ranges[ahead] = 1.0f;
 
   std::vector<float> out;
   const ValidationResult result = validator.Validate(frame, &out);
 
   EXPECT_TRUE(result.ShouldForward());
-  EXPECT_GT(validator.LastGroundReturnsSuppressed(), 300u);
-  EXPECT_NEAR(out[180], 1.0, 1e-6) << "a real obstacle on the ramp must survive";
-  EXPECT_TRUE(std::isinf(out[0])) << "the floor return must be suppressed";
+  EXPECT_GT(validator.LastGroundReturnsSuppressed(), 40u);
+  EXPECT_NEAR(out[ahead], 1.0, 1e-6) << "a real obstacle on the ramp must survive";
+
+  // Beam 0 is at angle_min, i.e. directly behind: aimed above the horizon, so
+  // its 5 m return is a wall and must be left alone.
+  EXPECT_NEAR(out[0], 5.0, 1e-6)
+    << "a rear beam cannot see the floor; suppressing it erases the far field";
 }
+
+
+TEST(LidarValidatorTest, TheFarFieldSurvivesWhilePitched) {
+  // The failure this exists for: the old rule discarded every return beyond
+  // the forward ground range, in every direction. On a 6 degree ramp that
+  // deleted everything past 4.31 m across the whole scan -- the far walls, the
+  // deck ahead, the guard rails -- and the costmap filled with fan-shaped
+  // voids where the raytracer then cleared the space.
+  //
+  // A wall at 15 m is not floor. It is far away, which is a different thing.
+  LidarValidator validator(HeavyLidarSpec(), {});
+  validator.SetPitch(6.0 * M_PI / 180.0);
+
+  const float wall = 15.0f;
+  std::vector<float> out;
+  const ValidationResult result = validator.Validate(HealthyScan(wall), &out);
+
+  ASSERT_TRUE(result.ShouldForward());
+  for (std::size_t i = 0; i < out.size(); ++i) {
+    EXPECT_NEAR(out[i], wall, 1e-6)
+      << "beam " << i << " was a 15 m wall and got deleted as floor";
+  }
+  EXPECT_EQ(validator.LastGroundReturnsSuppressed(), 0u);
+}
+
+
+TEST(LidarValidatorTest, OnlyBeamsAimedAtTheFloorHaveAGroundRange) {
+  LidarValidator validator(HeavyLidarSpec(), {});
+  validator.SetPitch(6.0 * M_PI / 180.0);
+
+  EXPECT_TRUE(std::isfinite(validator.GroundReturnRangeAt(0.0)))
+    << "straight ahead the beam is tilted into the floor";
+  EXPECT_TRUE(std::isinf(validator.GroundReturnRangeAt(M_PI / 2.0)))
+    << "a sideways beam stays level; it never meets the floor";
+  EXPECT_TRUE(std::isinf(validator.GroundReturnRangeAt(M_PI)))
+    << "a rear beam is aimed above the horizon";
+
+  // And the range grows as the beam swings away from straight ahead.
+  EXPECT_GT(validator.GroundReturnRangeAt(1.0), validator.GroundReturnRangeAt(0.0));
+}
+
 
 TEST(LidarValidatorTest, GroundRejectionCanBeDisabled) {
   LidarValidator::Options options;
@@ -496,3 +557,72 @@ TEST(CameraValidatorTest, IntensityCheckingCanBeDisabled) {
 }
 
 }  // namespace
+
+// ---------------------------------------------------------------------------
+// Ground rejection is directional
+// ---------------------------------------------------------------------------
+
+TEST(LidarValidatorTest, ClimbingARampDoesNotDeleteTheFarField) {
+  // The bug this exists for: GroundReturnRange() tested std::abs(pitch), so a
+  // robot pitched NOSE-UP -- beam aimed above the floor, which it can never
+  // reach -- still had every return past h/sin(pitch) discarded as "floor".
+  // On a 6 deg ramp that removed 83% of a 25 m scanner while the robot was on
+  // the ramp: the far walls, the deck ahead and the guard rails all left the
+  // costmap at the moment they mattered most.
+  LidarValidator validator(HeavyLidarSpec(), {});
+  validator.SetPitch(-6.0 * M_PI / 180.0);          // nose up, REP-103
+
+  EXPECT_TRUE(std::isinf(validator.GroundReturnRange()))
+    << "there is no ground to reject when the beam points above it";
+
+  const float far_wall = 18.0f;
+  std::vector<float> out;
+  const ValidationResult result = validator.Validate(HealthyScan(far_wall), &out);
+
+  ASSERT_TRUE(result.ShouldForward());
+  EXPECT_EQ(validator.LastGroundReturnsSuppressed(), 0u);
+  EXPECT_NEAR(out[0], far_wall, 1e-6);
+  EXPECT_NEAR(out[out.size() / 2], far_wall, 1e-6);
+}
+
+TEST(LidarValidatorTest, DescendingARampStillSuppressesTheFloor) {
+  // The other direction has to keep working, or the ramps close up again --
+  // but now only for the beams that can actually see the floor.
+  LidarValidator validator(HeavyLidarSpec(), {});
+  const double descending = 6.0 * M_PI / 180.0;
+  validator.SetPitch(descending);
+
+  const amr_core::LidarSpec spec = HeavyLidarSpec();
+  EXPECT_NEAR(validator.GroundReturnRangeAt(0.0),
+              spec.height / std::sin(descending), 1e-6);
+
+  const double increment =
+    (spec.max_angle - spec.min_angle) / static_cast<double>(spec.samples - 1);
+  LidarFrame frame = HealthyScan(2.0);
+  for (int i = 0; i < spec.samples; ++i) {
+    const double bearing = spec.min_angle + i * increment;
+    const double range = validator.GroundReturnRangeAt(bearing);
+    if (std::isfinite(range) && range < spec.range_max) {
+      frame.ranges[i] = static_cast<float>(range);
+    }
+  }
+
+  std::vector<float> out;
+  ASSERT_TRUE(validator.Validate(frame, &out).ShouldForward());
+  EXPECT_GT(validator.LastGroundReturnsSuppressed(), 40u)
+    << "the forward arc of floor returns must still be removed";
+}
+
+
+TEST(LidarValidatorTest, ARealObstacleSurvivesClimbingAndDescending) {
+  for (int sign = -1; sign <= 1; sign += 2) {
+    LidarValidator validator(HeavyLidarSpec(), {});
+    validator.SetPitch(sign * 9.0 * M_PI / 180.0);
+
+    LidarFrame frame = HealthyScan(1.5);
+    std::vector<float> out;
+    ASSERT_TRUE(validator.Validate(frame, &out).ShouldForward());
+    EXPECT_NEAR(out[0], 1.5, 1e-6)
+      << "an obstacle at 1.5 m must survive whichever way the robot is tilted";
+  }
+}

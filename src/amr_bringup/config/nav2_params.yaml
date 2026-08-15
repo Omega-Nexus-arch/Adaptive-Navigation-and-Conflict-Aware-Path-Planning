@@ -91,7 +91,13 @@ controller_server:
       decel_lim_theta: -0.8
       vx_samples: 20
       vy_samples: 1
-      vtheta_samples: 20
+      # 40, not 20. Over the +/- 1.5 rad/s command range, 20 samples is a
+      # 0.15 rad/s granularity -- coarse enough that when the robot is turning
+      # into the 2.1 m firewall doorway there may be no sampled trajectory that
+      # threads it, so DWB picks the least-bad one, overshoots, and corrects
+      # the other way. That is the hunting the user saw. Doubling the angular
+      # resolution costs a little CPU per cycle and is the standard fix.
+      vtheta_samples: 40
       sim_time: 1.7
       linear_granularity: 0.05
       angular_granularity: 0.025
@@ -170,7 +176,11 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.75
+        # Overwritten per robot by RewrittenYaml as footprint_radius + 0.05.
+        # The padding is deliberately small: the *inscribed* radius is what
+        # actually prevents collisions, and 0.20 m of extra padding meant a
+        # legal doorway carried cost at every pose inside it. See 8r.
+        inflation_radius: 0.60
 
       always_send_full_costmap: True
 
@@ -253,7 +263,11 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.75
+        # Overwritten per robot by RewrittenYaml as footprint_radius + 0.05.
+        # The padding is deliberately small: the *inscribed* radius is what
+        # actually prevents collisions, and 0.20 m of extra padding meant a
+        # legal doorway carried cost at every pose inside it. See 8r.
+        inflation_radius: 0.60
 
       always_send_full_costmap: True
 

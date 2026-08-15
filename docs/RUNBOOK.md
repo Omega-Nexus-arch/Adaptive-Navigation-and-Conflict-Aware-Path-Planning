@@ -52,7 +52,7 @@ colcon test --event-handlers console_direct+
 colcon test-result --verbose
 ```
 
-**Check:** 268 tests, 0 failures. This alone validates the motion smoother, the
+**Check:** 274 tests, 0 failures. This alone validates the motion smoother, the
 safety envelope, conflict detection, the yielding protocol, the sensor
 validators, selective mapping, map fusion, the slope cost model, the world
 geometry and every config loader.
@@ -235,6 +235,36 @@ exits 0.
 
 ---
 
+## Step 8b · Every goal pair, automatically
+
+```bash
+# with the fleet from step 7 still running
+ros2 run amr_bringup run_goal_matrix.py
+```
+
+Sends every ordered pair of named goals — 72 of them — one to each robot
+concurrently, and returns both robots to their docks between pairs so each
+trial starts from the same state. Per robot per pair it records the action
+result, time, final pose error, whether the safety override latched and why,
+whether traffic control issued a YIELD, peak speed and replan count.
+
+Those last few turn "it failed" into "it failed because": a pair that aborts
+with `halt_active` set throughout is a perception problem; one that aborts
+after forty replans is a costmap problem, and they need opposite fixes.
+
+Exits non-zero if any pair fails, and prints the failures with the command to
+re-run one on its own:
+
+```bash
+ros2 run amr_bringup run_goal_matrix.py --pairs heavy_storage:packing_bay_4
+ros2 run amr_bringup run_goal_matrix.py --filter mezzanine   # ramp goals only
+```
+
+Full run is roughly 72 x (up to 180 s + reset). Use `--filter` or `--pairs`
+while iterating.
+
+---
+
 ## Step 9 · Selective mapping (System Optimization)
 
 ```bash
@@ -379,6 +409,11 @@ milliseconds.
 | Pedestrians render as nothing | `ls /usr/share/gazebo-11/media/models/run.dae` | The running skin ships with Gazebo. If it is absent, install `gazebo11-common`. |
 | Pedestrians visible but never sensed | `ros2 topic echo /amr1/scan --once` while one crosses in front | Actor bone collisions must be present. Confirm the world has `<collision` inside each `<actor>`; regenerate if not. |
 | AMR stalls at the foot of a ramp | `ros2 run amr_bringup check_model_consistency.py` | Confirms the steepest ramp is within every model's `max_traversable_angle_degrees`. Ramps are 5-9 deg; anything above ~10 deg is not climbable by these drivetrains. |
+| A robot hunts or stalls **in the firewall doorway** | `ros2 param get /amr1/local_costmap/local_costmap inflation_radius` | Should be 0.60 (= `footprint_radius` + 0.05), not 0.75. A corridor of width `W` leaves a zero-cost centre band of `W - 2*inflation_radius`; the 2.10 m doorway needs the small padding to leave 0.90 m of it. Covered by `test_pinch_admits_one_robot_but_not_two`. See DESIGN_NOTES 8r. |
+| A robot creeps or stalls on a ramp | `ros2 run amr_bringup check_model_consistency.py` | `plant_accel_limit` must exceed both the model's own `max_accel_x` and `g*sin(theta)` on the steepest ramp (1.53 m/s^2 at 9 deg). It is in rad/s^2 once the xacro divides by wheel radius. |
+| AMRs drive through pedestrians | - | The actor's bone collision column must span the scan plane. `test_a_human_is_solid_across_both_scan_planes` checks it; regenerate the world if the check passes but the sim disagrees. |
+| `xacro: not well-formed (invalid token)` | - | An XML comment contains `--`, which is illegal. `test_no_xacro_comment_contains_a_double_hyphen` catches it. |
+| Scan shows fan-shaped voids / walls half missing | `ros2 topic echo /amr1/sensor_health --once` | Ground rejection over-suppressing. It applies per beam, in a 60 deg forward arc, in a band around the predicted floor range — never "everything beyond". See DESIGN_NOTES 8q. |
 | `colcon test` fails but gtest/pytest all pass | `colcon test-result --verbose \| grep -E 'gtest\|pytest'` | Only the style linters failed. Run `ament_uncrustify --reformat` in the package. |
 
 ---

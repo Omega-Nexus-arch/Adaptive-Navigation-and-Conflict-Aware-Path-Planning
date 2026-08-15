@@ -94,7 +94,7 @@ behaviour regresses. **Demo** means a script that exits non-zero on failure.
 | **Motion Control** | Observably smooth; velocity profile modulates with environment | Jerk-limited S-curve; `SmootherDiagnostics` reports which constraint bound each tick, so smoothness is attributable rather than assumed |
 | **Custom Integration** | Functional HAL class used by the nav node; validation runs and logs for IMU and camera | `amr_sensor_bsp` gates every sensor stream structurally; `SensorHealth` telemetry per stream |
 | **System Optimization** | Programmatically restrict the map update area on a defined condition | `SelectiveMappingPolicy` with a four-way cell classification; `MapUpdateStats` publishes the achieved suppression ratio |
-| **Code Quality & Build** | Clean, commented, modular; builds cleanly; compelling refactoring demo | 9 packages, ROS-free algorithm cores, 268 tests, `REFACTORING.md` |
+| **Code Quality & Build** | Clean, commented, modular; builds cleanly; compelling refactoring demo | 9 packages, ROS-free algorithm cores, 274 tests, `REFACTORING.md` |
 
 ---
 

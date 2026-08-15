@@ -46,7 +46,19 @@ HUMAN_TURN_SECONDS = 0.7
 #: work and the hips fill in the torso. Spheres because a bone's frame is
 #: rotated (the skeleton is Y-up) and a sphere is the one shape that does not
 #: care.
-HUMAN_BONE_COLLISIONS = {'LeftLeg': 0.22, 'RightLeg': 0.22, 'Hips': 0.40}
+HUMAN_BONE_COLLISIONS = {
+    # A continuous column of spheres, not three markers. The AMRs were driving
+    # straight through the pedestrians: two 0.22 m knees and one 0.40 m hip
+    # leave vertical gaps, and a 2D LiDAR samples exactly one height -- so
+    # whether a person is seen at all came down to whether that one scan plane
+    # happened to intersect a sphere. These overlap from the feet to the chest
+    # and are wide enough that a beam cannot slip between two of them.
+    'LeftFoot': 0.20, 'RightFoot': 0.20,       # ~0.00 - 0.40 m
+    'LeftLeg': 0.30, 'RightLeg': 0.30,         # ~0.25 - 0.85 m  <- both scan planes
+    'LeftUpLeg': 0.30, 'RightUpLeg': 0.30,     # ~0.65 - 1.25 m
+    'Hips': 0.45,                              # ~0.55 - 1.45 m
+    'LowerBack': 0.40,                         # ~0.70 - 1.50 m
+}
 
 #: Height of the knee bones on the 1.8 m skeleton [m], read off the reference
 #: world's saved actor state. This is what makes the knee spheres the right
@@ -273,38 +285,44 @@ def _storage_block(
     rows_y: Sequence[float],
     x_start: float,
     x_end: float,
-    segment: float = 3.6,
-    gap: float = 0.9,
+    segment: float = 4.0,
+    gap: float = 3.0,
     depth: float = 1.0,
     height: float = 2.4,
 ) -> List[Box]:
-    """Build a block of storage racks as rows of continuous shelving.
+    """Build a block of storage racks as rows of bays with cross-aisles.
 
-    Each row is UNBROKEN from ``x_start`` to ``x_end``. It is still drawn as
-    separate segments, because a real rack run is bays bolted together, but the
-    bays are butted rather than spaced.
+    ``gap`` is a real cross-aisle, sized from the costmap rather than from
+    taste: a robot needs ``2 * inflation_radius + width`` of clear space to have
+    any zero-cost pose in it, which is 2 * 0.75 + 1.10 = 2.60 m. The default of
+    3.0 m leaves a 1.50 m cost-free lane.
 
-    The rows used to carry 0.9 m gaps between segments, on the theory that
-    cross-aisles give the planner route choices. In practice the AMRs are
-    1.1 m wide: the gap was too narrow to drive through and too wide for the
-    costmap to write off, so a robot would commit to it, wedge, and sit there.
-    A 0.9 m hole in a wall is not a route, it is a trap.
+    This has been wrong in both directions. It started at 0.9 m -- too narrow
+    to drive through, wide enough that the planner would still try, so a robot
+    would commit and wedge. The fix was to close the gaps entirely, which
+    removed the trap and replaced it with a worse problem: 16 m of unbroken
+    shelving, so reaching an aisle meant driving the length of the block and
+    back, and an ordinary point-to-point mission turned into a 30 m detour
+    through the middle of the warehouse.
 
-    With the rows solid, an aisle is entered around the end of a row -- which
-    is how warehouse traffic actually works, and it gives the global planner a
-    real decision (which end) instead of a false one. ``gap`` is retained in the
-    signature for callers that genuinely want spaced shelving; it is unused for
-    these blocks and asserted to be irrelevant by test_world_generation.py.
+    A gap has to be either comfortably drivable or absent. Both failures came
+    from picking a number without checking it against the inflation radius, and
+    the rule is now asserted rather than reasoned about each time. See
+    DESIGN_NOTES 8p.
     """
-    del gap
     boxes: List[Box] = []
     span = x_end - x_start
-    count = max(1, int(round(span / segment)))
-    actual = span / count          # butt the segments; no gap between them
+
+    # Choose the bay count that gets closest to the requested bay length while
+    # keeping every gap exactly `gap` wide.
+    count = max(1, int(round((span + gap) / (segment + gap))))
+    while count > 1 and (span - (count - 1) * gap) / count < 1.5:
+        count -= 1                 # bays shorter than 1.5 m are not shelving
+    actual = (span - (count - 1) * gap) / count
 
     for row_index, y in enumerate(rows_y):
         for seg_index in range(count):
-            left = x_start + seg_index * actual
+            left = x_start + seg_index * (actual + gap)
             boxes.append(
                 Box(
                     name=f'{prefix}_rack_{row_index}_{seg_index}',
@@ -388,8 +406,8 @@ def build_warehouse() -> WorldSpec:
     # Fewer rows pay for the wider aisles, which is the right trade -- an aisle
     # a robot cannot use is not storage capacity, it is decoration.
     #
-    # South-west heavy storage: two rows, one 4.0 m aisle, sealed at the west
-    # wall so the aisle has exactly one mouth (the east end).
+    # South-west heavy storage: two rows, one 4.0 m aisle, and cross-aisles
+    # through the rows so a robot can cut across instead of driving 16 m round.
     spec.boxes += _storage_block('heavy', (-14.0, -9.0), -21.5, -5.0)
     # North-west general storage: two rows, was three.
     spec.boxes += _storage_block('general', (7.0, 12.0), -21.5, -7.0)
@@ -398,11 +416,19 @@ def build_warehouse() -> WorldSpec:
 
     # -- Central firewall with a single flat doorway (The Pinch) -------------
     # Segment extents chosen so the only ground-level opening is
-    # y in [-1.0, 1.0]; everything from y = 2.0 to y = 5.2 is closed by the
+    # y in [-1.05, 1.05]; everything from y = 2.0 to y = 5.2 is closed by the
     # Hump Bridge plinth itself.
+    #
+    # 2.1 m, and the width is pinned from both sides. Wider than 2.19 m and two
+    # robots abreast are further apart than the conflict detector's threshold
+    # (0.55 + 0.37 + 0.35 = 1.27 m), so they would simply pass and the yielding
+    # protocol -- the thing the brief actually asks for -- would never fire.
+    # Narrower and the controller has no room. 2.1 m keeps the yield forced and
+    # leaves a 0.90 m band of zero-cost centre positions once the inflation
+    # padding is sane. See DESIGN_NOTES 8r.
     spec.boxes += [
-        Box('firewall_south', 0.0, -7.95, 0.0, 0.4, 13.9, h, material='Gazebo/DarkGrey'),
-        Box('firewall_mid', 0.0, 1.5, 0.0, 0.4, 1.0, h, material='Gazebo/DarkGrey'),
+        Box('firewall_south', 0.0, -7.975, 0.0, 0.4, 13.85, h, material='Gazebo/DarkGrey'),
+        Box('firewall_mid', 0.0, 1.525, 0.0, 0.4, 0.95, h, material='Gazebo/DarkGrey'),
         Box('firewall_north', 0.0, 10.05, 0.0, 0.4, 9.7, h, material='Gazebo/DarkGrey'),
         # NO DOOR JAMBS. They were 1.2 m tall markers at y = +/-1.05, meant to
         # make the doorway legible -- but they protrude 0.1 m past each face of
@@ -524,17 +550,25 @@ def build_warehouse() -> WorldSpec:
     #      and `ped_3` straddles the east mouth of The Pinch.
     spec.dynamics += [
         DynamicObstacle(
-            # South-west aisle, below the rack block.
-            'ped_0', 'human', 0.35, 1.80, -14.0, 1.0,
-            waypoints=((-14.0, 1.0), (-9.0, 1.0), (-9.0, -2.0), (-14.0, -2.0)),
-            speed=0.9, material='Gazebo/Yellow',
+            # The long west-side sweep: south down the open corridor, west
+            # along y = -5, and back. Kept as a closed rectangle rather than an
+            # out-and-back -- a path that ends where it starts gives the actor
+            # script a zero-length final leg, i.e. two waypoints at the same
+            # timestamp, and Gazebo stalls the actor there.
+            #
+            # x = -6.6 rather than -6.0 clears the Hump Bridge's west ramp by
+            # 1.38 m instead of 0.78 m; x = -14.5 rather than -18.0 keeps the
+            # west leg 4.0 m off both docks.
+            'ped_0', 'human', 0.35, 1.80, -6.6, 5.0,
+            waypoints=((-6.6, 5.0), (-6.6, -5.0), (-14.5, -5.0), (-14.5, 5.0)),
+            speed=0.55, material='Gazebo/Yellow',
         ),
         DynamicObstacle(
             # North-west cross-aisles at x = -16.5 and x = -12, the only two
             # gaps through that rack block.
             'ped_1', 'human', 0.35, 1.80, -5.0, 7.8,
             waypoints=((-5.0, 7.8), (-3.0, 7.8), (-3.0, 12.2), (-5.0, 12.2)),
-            speed=0.75, material='Gazebo/Purple',
+            speed=0.45, material='Gazebo/Purple',
         ),
         DynamicObstacle(
             # East corridor, across AMR-2's final approach to Packing Bay 4.
@@ -542,7 +576,7 @@ def build_warehouse() -> WorldSpec:
             # steep ramp.
             'ped_2', 'human', 0.35, 1.80, 5.5, -1.2,
             waypoints=((5.5, -1.2), (13.0, -1.2), (13.0, -3.2), (5.5, -3.2)),
-            speed=1.05, material='Gazebo/Purple',
+            speed=0.65, material='Gazebo/Purple',
         ),
         DynamicObstacle(
             # AMR-2's final approach to Packing Bay 4. Deliberately NOT at the
@@ -550,15 +584,15 @@ def build_warehouse() -> WorldSpec:
             # into a blockage.
             'ped_3', 'human', 0.35, 1.80, 11.0, 2.5,
             waypoints=((11.0, 2.5), (14.0, 2.5), (14.0, 0.5), (11.0, 0.5)),
-            speed=0.6, material='Gazebo/Purple',
+            speed=0.4, material='Gazebo/Purple',
         ),
-        DynamicObstacle(
-            # West main corridor, crossing AMR-2's eastbound run -- but held
-            # 4.5 m clear of both docks so the AMRs get out cleanly.
-            'thirdparty_0', 'box', 0.45, 0.5, -3.5, -5.0,
-            waypoints=((-3.5, -5.0), (-1.8, -5.0), (-1.8, -11.5), (-3.5, -11.5)),
-            speed=0.7, material='Gazebo/Red',
-        ),
+        # DynamicObstacle(
+        #     # West main corridor, crossing AMR-2's eastbound run -- but held
+        #     # 4.5 m clear of both docks so the AMRs get out cleanly.
+        #     'thirdparty_0', 'box', 0.45, 0.5, -3.5, -5.0,
+        #     waypoints=((-3.5, -5.0), (-1.8, -5.0), (-1.8, -11.5), (-3.5, -11.5)),
+        #     speed=0.7, material='Gazebo/Red',
+        # ),
         DynamicObstacle(
             # South-east corridor, on the west_staging -> east_staging route
             # used by the slope demo. Was (10, 0)..(16, 5.5), which overlapped

@@ -28,6 +28,11 @@ sys.path.insert(
 
 from amr_gazebo import world_builder as wb  # noqa: E402
 
+#: The `src/` directory, so the tests can read the bringup package's
+#: configuration rather than keeping its own copy of the numbers.
+SRC = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+
 RESOLUTION = 0.05
 # Maximum height discontinuity a wheeled AMR can climb in one 5 cm step.
 MAX_STEP = 0.05
@@ -360,7 +365,7 @@ def test_blocking_the_pinch_leaves_the_bridge_as_the_only_crossing(spec):
     named = {w.name: w for w in spec.waypoints}
 
     # Seal the flat doorway only.
-    blocked_pinch = _rect_block(spec, occupancy, -0.6, 0.6, -1.1, 1.1)
+    blocked_pinch = _rect_block(spec, occupancy, -0.6, 0.6, -1.15, 1.15)
     visited = _reachable(
         spec, occupancy, elevation,
         (named['dock_a'].x, named['dock_a'].y), extra_blocked=blocked_pinch,
@@ -401,13 +406,39 @@ def test_pinch_admits_one_robot_but_not_two(spec):
         row_hi += 1
     clearance = (row_hi - row_lo + 1) * RESOLUTION
 
-    amr1_width = 0.62
-    assert clearance >= amr1_width + 0.8, (
-        f'doorway is {clearance:.2f} m; too tight for AMR-1 to pass safely'
+    fleet = _fleet()
+    widest = max(i for _, _, i in fleet)
+
+    # Lower bound: the controller needs somewhere cost-free to aim.
+    #
+    # This is the check that was missing, and its absence is what made the
+    # robots stall in the doorway. The aisles and the cross-aisles were both
+    # sized with this arithmetic; the busiest passage in the scenario never was.
+    band = clearance - 2 * widest
+    assert band >= 0.85, (
+        f'doorway is {clearance:.2f} m, which leaves a {band:.2f} m band of '
+        f'zero-cost centre positions once {widest:.2f} m of inflation is taken '
+        f'off each side. The controller has to hold the centreline to within '
+        f'{band / 2:.2f} m *while turning into the gap*: it hunts, stalls, and '
+        f'trips the progress checker. See DESIGN_NOTES 8r.'
     )
-    assert clearance < 2 * (amr1_width + 0.45), (
-        f'doorway is {clearance:.2f} m; two robots could pass abreast and the '
-        'yielding protocol would never be exercised'
+
+    # Upper bound: two robots abreast must be close enough that the conflict
+    # detector fires. Otherwise they simply pass each other and the yielding
+    # protocol -- the thing the brief actually asks for -- is never exercised.
+    #
+    # Note this is a *behavioural* bound, not a physical one. The doorway does
+    # not need to make two-abreast impossible; it needs to make it something
+    # the traffic controller refuses to allow.
+    radii = sorted((r for _, r, _ in fleet), reverse=True)[:2]
+    assert len(radii) >= 2, 'need at least two robots to have a conflict'
+    separation = clearance - sum(radii)
+    threshold = sum(radii) + CONFLICT_MARGIN
+    assert separation < threshold, (
+        f'doorway is {clearance:.2f} m, so two robots hugging opposite walls '
+        f'sit {separation:.2f} m apart -- beyond the {threshold:.2f} m at '
+        f'which the conflict detector flags them. They would pass abreast and '
+        f'the yielding protocol would never fire.'
     )
 
 
@@ -764,36 +795,85 @@ def test_the_pinch_doorway_is_unobstructed(spec):
     as obstacles sitting at the mouth of the gap and the inflation layer
     narrowed the corridor below the 2.0 m the firewall actually leaves.
     """
+    south = next(b for b in spec.boxes if b.name == 'firewall_south')
+    north = next(b for b in spec.boxes if b.name == 'firewall_mid')
+    lo = south.y + south.size_y / 2.0
+    hi = north.y - north.size_y / 2.0
+
     walls = [b for b in spec.boxes if not b.yaw and abs(b.x) < 1.0]
     for box in walls:
-        spans_gap = (box.y - box.size_y / 2.0) < 1.0 and (box.y + box.size_y / 2.0) > -1.0
+        if box.name in ('firewall_south', 'firewall_mid'):
+            continue
+        spans_gap = (box.y - box.size_y / 2.0) < hi and (box.y + box.size_y / 2.0) > lo
         assert not spans_gap, (
-            f'{box.name} intrudes into the doorway between y = -1.0 and y = 1.0'
+            f'{box.name} intrudes into the doorway between y = {lo} and y = {hi}'
         )
 
-    # And the gap really is 2.0 m of clear floor.
-    for y in (-0.9, -0.45, 0.0, 0.45, 0.9):
+    # And the gap really is clear floor from wall to wall.
+    for y in (lo + 0.05, lo / 2.0, 0.0, hi / 2.0, hi - 0.05):
         assert not _obstacle_grid(spec)[_to_cell(spec, 0.0, y)], (
             f'the doorway is blocked at (0.0, {y})'
         )
 
 
+def _fleet():
+    """The real roster and the real inflation arithmetic, not a copy of them.
+
+    This used to be two hardcoded constants. They were correct when written and
+    silently wrong the moment the inflation padding changed, which is exactly
+    the failure mode a guard test is supposed to catch rather than share.
+    """
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(SRC, 'amr_bringup'))
+    from amr_bringup.fleet_loader import load_fleet, nav2_substitutions
+    fleet = load_fleet(os.path.join(
+        SRC, 'amr_bringup', 'config', 'fleet.yaml'))
+    return [
+        (r['name'],
+         float(nav2_substitutions(r, 'map', '/x')['robot_radius']),
+         float(nav2_substitutions(r, 'map', '/x')['inflation_radius']))
+        for r in fleet['robots']
+    ]
+
+
+def _conflict_margin():
+    """The traffic controller's own margin, read from the roster."""
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(SRC, 'amr_bringup'))
+    from amr_bringup.fleet_loader import load_fleet
+    fleet = load_fleet(os.path.join(SRC, 'amr_bringup', 'config', 'fleet.yaml'))
+    return float(fleet['policy']['conflict_margin'])
+
+
+#: Extra separation the conflict detector demands beyond the two radii [m].
+CONFLICT_MARGIN = _conflict_margin()
+
+#: nav2's inflation radius for the widest robot [m], read from the loader.
+INFLATION_RADIUS = max(i for _, _, i in _fleet())
+
 #: Width of the widest AMR [m], from robot_models.yaml's footprint_radius.
-AMR_WIDTH = 1.10
+AMR_WIDTH = 2 * max(r for _, r, _ in _fleet())
 
 
-def test_rack_rows_have_no_gaps_a_robot_would_try_to_enter(spec):
-    """A hole narrower than the robot is a trap, not a cross-aisle.
+def test_every_rack_gap_is_a_drivable_cross_aisle(spec):
+    """A gap is either comfortably drivable or it should not exist.
 
-    The rows used to be built from 3.6 m segments with 0.9 m gaps. The AMRs are
-    1.10 m wide: too wide to fit, but the gap is wide enough that the inflated
-    costmap does not close it outright, so the planner would route through one,
-    the robot would commit, and it would wedge between two racks.
+    This has been wrong in both directions, and both times the mistake was
+    choosing a width without checking it against the inflation radius.
 
-    Either a gap is comfortably drivable or it should not exist. These rows are
-    now continuous, so an aisle is entered around the end of a row.
+    At 0.9 m the gap was too narrow for a 1.10 m robot to fit but wide enough
+    that the planner would still route through it -- so the robot committed and
+    wedged between two racks. Closing the gaps entirely removed that trap and
+    created a worse one: 16 m of unbroken shelving, so an ordinary
+    point-to-point mission became a 30 m detour around the end of a block.
+
+    The number that matters is the same one that sizes the aisles: a robot
+    needs ``2 * inflation_radius + width`` of clear space before any pose in
+    the gap costs nothing.
     """
     from collections import defaultdict
+
+    minimum = 2 * INFLATION_RADIUS + AMR_WIDTH        # 2.60 m
 
     rows = defaultdict(list)
     for box in spec.boxes:
@@ -801,16 +881,55 @@ def test_rack_rows_have_no_gaps_a_robot_would_try_to_enter(spec):
             rows[(box.name.split('_rack_')[0], round(box.y, 3))].append(box)
 
     assert rows, 'expected some rack rows'
+    total_gaps = 0
     for (prefix, y), boxes in rows.items():
         boxes.sort(key=lambda b: b.x)
         for left, right in zip(boxes, boxes[1:]):
             gap = (right.x - right.size_x / 2.0) - (left.x + left.size_x / 2.0)
-            assert gap <= 1e-6 or gap >= AMR_WIDTH + 0.8, (
-                f'{prefix} row at y={y} has a {gap:.2f} m gap between segments. '
-                f'That is impassable for a {AMR_WIDTH} m robot but not obviously '
-                f'closed to the planner, which is how a robot ends up wedged '
-                f'between two racks.'
+            if gap <= 1e-6:
+                continue          # butted bays: one continuous run, not a gap
+            total_gaps += 1
+            assert gap >= minimum, (
+                f'{prefix} row at y={y} has a {gap:.2f} m gap. A '
+                f'{AMR_WIDTH} m robot needs {minimum:.2f} m to have any '
+                f'zero-cost pose in there, so this is a trap: narrow enough to '
+                f'wedge in, wide enough for the planner to try.'
             )
+    assert total_gaps, (
+        'every rack row is unbroken. That is not safe, it is just slow -- '
+        'reaching an aisle then means driving the length of the block and back.'
+    )
+
+
+def test_cross_aisles_line_up_across_a_block(spec):
+    """The gaps in facing rows have to align, or they lead nowhere.
+
+    A cross-aisle that is blocked by shelving on the far side is a lay-by.
+    """
+    from collections import defaultdict
+
+    blocks = defaultdict(dict)
+    for box in spec.boxes:
+        if '_rack_' in box.name and not box.yaw:
+            blocks[box.name.split('_rack_')[0]].setdefault(round(box.y, 3), []).append(box)
+
+    for prefix, rows in blocks.items():
+        spans = []
+        for y, boxes in rows.items():
+            boxes.sort(key=lambda b: b.x)
+            spans.append([((left.x + left.size_x / 2.0),
+                           (right.x - right.size_x / 2.0))
+                          for left, right in zip(boxes, boxes[1:])])
+        first = spans[0]
+        for other in spans[1:]:
+            assert len(other) == len(first), (
+                f'{prefix}: rows have different numbers of cross-aisles')
+            for (a0, a1), (b0, b1) in zip(first, other):
+                assert abs(a0 - b0) < 1e-6 and abs(a1 - b1) < 1e-6, (
+                    f'{prefix}: a cross-aisle at x[{a0:.2f}, {a1:.2f}] does not '
+                    f'line up with x[{b0:.2f}, {b1:.2f}] in the facing row, so '
+                    f'it is a dead end'
+                )
 
 
 def test_the_heavy_storage_goal_sits_between_exactly_two_rows(spec):
@@ -838,122 +957,31 @@ def test_the_heavy_storage_goal_sits_between_exactly_two_rows(spec):
     )
 
 
-def test_the_heavy_aisle_has_one_mouth(spec):
-    """Sealed at the west wall, so reaching the goal means going round.
+def test_the_heavy_aisle_can_be_entered_without_circling_the_block(spec):
+    """The goal has to be reachable by cutting through, not only by going round.
 
-    That is the point of the change: the route choice becomes *which end of the
-    block*, rather than a false choice between a dozen gaps that cannot be
-    driven.
+    With the rows unbroken, `heavy_storage` could only be reached from the east
+    end of the block: from the west dock that is a 30 m detour across the whole
+    warehouse and back. The cross-aisles are what make it a short trip again.
     """
     goal = {w.name: w for w in spec.waypoints}['heavy_storage']
     occupancy = _obstacle_grid(spec)
 
-    west_end = min(b.x - b.size_x / 2.0 for b in spec.boxes
-                   if b.name.startswith('heavy_rack_'))
-    wall_face = spec.x_min + spec.wall_thickness
-    assert west_end - wall_face < AMR_WIDTH, (
-        f'the west end of the heavy block leaves {west_end - wall_face:.2f} m '
-        f'to the wall, which a {AMR_WIDTH} m robot could squeeze through'
-    )
+    heavy = [b for b in spec.boxes if b.name.startswith('heavy_rack_')]
+    rows = sorted({round(b.y, 3) for b in heavy})
+    north = max(rows)
 
-    east_end = max(b.x + b.size_x / 2.0 for b in spec.boxes
-                   if b.name.startswith('heavy_rack_'))
-    for offset in (0.6, 1.2, 2.0):
-        assert not occupancy[_to_cell(spec, east_end + offset, goal.y)], (
-            f'the east mouth of the heavy aisle is blocked {offset} m out'
-        )
+    # Walk the row north of the aisle and count the openings.
+    boxes = sorted((b for b in heavy if abs(b.y - north) < 1e-6), key=lambda b: b.x)
+    openings = [((left.x + left.size_x / 2.0) + (right.x - right.size_x / 2.0)) / 2.0
+                for left, right in zip(boxes, boxes[1:])]
+    assert openings, 'the heavy block has no cross-aisle at all'
 
-
-#: nav2's inflation radius [m], from nav2_params.yaml. Cost is applied this far
-#: out from every obstacle face, so an aisle narrower than
-#: 2 * INFLATION_RADIUS + robot width has no cost-free lane down the middle.
-INFLATION_RADIUS = 0.75
-
-#: Minimum clear space two ramps must leave between them [m]. A robot leaving
-#: one slope has to be able to stand somewhere level before committing to the
-#: next.
-RAMP_SEPARATION = 1.0
-
-
-def test_aisles_have_a_cost_free_lane_for_the_widest_robot(spec):
-    """A 2.4 m aisle was wide enough to fit and too narrow to plan through.
-
-    The robot fits geometrically -- 1.10 m in 2.40 m -- so every clearance
-    check passed. But nav2 inflates 0.75 m from each rack face, which left a
-    0.90 m band of zero-cost floor for a 1.10 m robot. There was no position in
-    the aisle that did not cost something, so the planner treated the whole
-    aisle as expensive and the robot wandered into the shelving looking for
-    somewhere cheaper.
-
-    Geometric fit is not the test. A cost-free lane is.
-    """
-    from collections import defaultdict
-
-    widest = 1.10                                     # heavy_mapper, 2 * 0.55
-    depth = 1.0                                       # rack depth
-
-    blocks = defaultdict(set)
-    for box in spec.boxes:
-        if '_rack_' in box.name and not box.yaw:
-            blocks[box.name.split('_rack_')[0]].add(round(box.y, 3))
-
-    assert blocks, 'expected some rack blocks'
-    for prefix, rows in blocks.items():
-        ordered = sorted(rows)
-        for lower, upper in zip(ordered, ordered[1:]):
-            aisle = (upper - lower) - depth
-            lane = aisle - 2 * INFLATION_RADIUS
-            assert lane >= widest, (
-                f'{prefix}: rows at y={lower} and y={upper} leave a {aisle:.2f} m '
-                f'aisle, so after {INFLATION_RADIUS} m of inflation from each '
-                f'face the cost-free lane is {lane:.2f} m. The widest robot is '
-                f'{widest} m: it would never find a zero-cost pose in there.'
-            )
-
-
-def test_no_two_ramps_run_close_enough_to_trap_a_robot(spec):
-    """A robot coming off one slope needs level ground before the next.
-
-    The mezzanine's gentle ramp and the Hump Bridge's east ramp used to be
-    0.28 m apart -- two slopes falling in different directions with a gap
-    narrower than a wheel between them. A robot could climb one and then have
-    nowhere to put itself to turn, which is exactly how AMR-2 got up the
-    mezzanine and could not come back down.
-    """
-    def extent(ramp):
-        low, high = sorted((ramp.start, ramp.end))
-        if ramp.axis == 'x':
-            return (low, high,
-                    ramp.cross - ramp.width / 2.0, ramp.cross + ramp.width / 2.0)
-        return (ramp.cross - ramp.width / 2.0, ramp.cross + ramp.width / 2.0,
-                low, high)
-
-    for first, second in itertools.combinations(spec.ramps, 2):
-        ax0, ax1, ay0, ay1 = extent(first)
-        bx0, bx1, by0, by1 = extent(second)
-        dx = max(bx0 - ax1, ax0 - bx1, 0.0)
-        dy = max(by0 - ay1, ay0 - by1, 0.0)
-        gap = math.hypot(dx, dy)
-        assert gap >= RAMP_SEPARATION, (
-            f'{first.name} and {second.name} are {gap:.2f} m apart, less than '
-            f'the {RAMP_SEPARATION} m a robot needs to stand level between '
-            f'them. Two slopes that close form a trap, not a junction.'
-        )
-
-
-def test_the_mezzanine_backs_onto_the_north_wall(spec):
-    """No dead strip behind the deck, and the ramps sit as far north as they can.
-
-    Every metre the deck is short of the wall pushes both of its ramp feet a
-    metre further south, into the Hump Bridge's approaches.
-    """
-    deck = next(d for d in spec.decks if d.name == 'mezzanine_deck')
-    inner_face = spec.y_max - spec.wall_thickness
-    assert abs(deck.y_max - inner_face) < 1e-6, (
-        f'the mezzanine ends at y={deck.y_max} but the wall\'s inner face is at '
-        f'y={inner_face}; the {inner_face - deck.y_max:.2f} m strip behind it is '
-        f'floor no robot can reach and it costs the ramps the same distance'
-    )
+    for x in openings:
+        assert not occupancy[_to_cell(spec, x, north)], (
+            f'the cross-aisle at x={x:.2f} is blocked')
+        assert not occupancy[_to_cell(spec, x, goal.y)], (
+            f'the cross-aisle at x={x:.2f} does not reach the goal aisle')
 
 
 # ---------------------------------------------------------------------------

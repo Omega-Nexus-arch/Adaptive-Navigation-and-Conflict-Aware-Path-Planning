@@ -39,10 +39,21 @@
         <wheel_diameter>${2.0 * m['wheel_radius']}</wheel_diameter>
 
         <max_wheel_torque>${m['wheel_torque']}</max_wheel_torque>
-        <!-- Plant-level acceleration ceiling. Set generously above the
-             smoother's limits so that observed smoothness is demonstrably the
-             work of our controller, not of a saturating simulator. -->
-        <max_wheel_acceleration>${m['max_accel_x'] * 4.0}</max_wheel_acceleration>
+        <!-- Plant-level acceleration ceiling, in rad/s^2 of WHEEL angular
+             acceleration. Set generously above the smoother's limits so that
+             observed smoothness is demonstrably the work of our controller,
+             not of a saturating simulator.
+
+             NOTE THE DIVISION BY WHEEL RADIUS. This is an ANGULAR limit; the
+             value in the model library is linear. Without the division the
+             heavy unit's ceiling came out at 1.40 rad/s^2, i.e. 0.16 m/s^2 of
+             linear acceleration — less than half the 0.35 m/s^2 the model
+             declares, and a sixth of the 1.03 m/s^2 gravity pulls a robot down
+             a 6 deg ramp. Neither robot could out-accelerate the slope it was
+             standing on, so both stalled, and the light scout stalled hardest
+             because its smaller wheels make the missing 1/r bite harder.
+             See DESIGN_NOTES 8n. -->
+        <max_wheel_acceleration>${m['plant_accel_limit'] / m['wheel_radius']}</max_wheel_acceleration>
 
         <publish_odom>true</publish_odom>
         <publish_odom_tf>true</publish_odom_tf>
