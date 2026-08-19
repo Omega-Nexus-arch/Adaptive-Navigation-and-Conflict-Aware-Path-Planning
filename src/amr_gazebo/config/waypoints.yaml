@@ -47,7 +47,7 @@ waypoints:
     description: "West-side counterpart for the slope experiment"
   pinch_west:
     x: -3.5
-    y: 0.0
+    y: -2.0
     yaw: 0.000000
     level: "ground"
     description: "West approach to The Pinch"

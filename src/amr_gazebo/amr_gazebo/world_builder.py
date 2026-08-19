@@ -623,7 +623,7 @@ def build_warehouse() -> WorldSpec:
                  'East-side goal for the flat-doorway vs sloped-bridge test'),
         Waypoint('west_staging', -14.0, -1.0, 0.0,
                  'West-side counterpart for the slope experiment'),
-        Waypoint('pinch_west', -3.5, 0.0, 0.0, 'West approach to The Pinch'),
+        Waypoint('pinch_west', -3.5, -2.0, 0.0, 'West approach to The Pinch'),
         Waypoint('pinch_east', 3.5, 0.0, math.pi, 'East approach to The Pinch'),
     ]
 
