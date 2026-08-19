@@ -1377,3 +1377,72 @@ def test_every_ramp_and_deck_appears_in_the_manifest(spec):
     records = [line for line in manifest.splitlines()
                if line and not line.startswith('#')]
     assert len(records) == len(spec.ramps) + len(spec.decks)
+
+
+def test_every_pedestrian_bone_link_is_registered_with_physics(spec):
+    """A bare <collision> in an actor link is parsed and then ignored.
+
+    Gazebo Classic will accept an actor link containing only a <collision> and
+    never register it with the physics engine, so the sphere exists in the SDF
+    and is invisible to every ray sensor. The world file looks correct and the
+    AMRs drive straight through the pedestrians.
+
+    The reference warehouse whose actors *are* detectable gives every bone link
+    a pose, gravity, self_collide and -- the one that matters -- an <inertial>
+    block. Without a mass the link is treated as a pure animation node.
+    """
+    import xml.etree.ElementTree as ET
+
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        'worlds', f'{spec.name}.world')
+    world = ET.parse(path).getroot().find('world')
+    actors = world.findall('actor')
+    assert actors, 'expected pedestrian actors in the world'
+
+    for actor in actors:
+        links = actor.findall('link')
+        assert links, f'{actor.get("name")} has no bone links'
+        for link in links:
+            tags = {child.tag for child in link}
+            for required in ('collision', 'inertial', 'pose', 'gravity', 'self_collide'):
+                assert required in tags, (
+                    f'{actor.get("name")}/{link.get("name")} is missing '
+                    f'<{required}>. Without <inertial> in particular the link '
+                    f'is never registered with the physics engine and its '
+                    f'collision sphere cannot be hit by a LiDAR ray.'
+                )
+            mass = link.find('inertial/mass')
+            assert mass is not None and float(mass.text) > 0.0, (
+                f'{actor.get("name")}/{link.get("name")} has zero or missing mass'
+            )
+
+
+def test_every_dynamic_obstacle_is_tall_enough_for_every_scan_plane(spec):
+    """The rigid obstacle was shorter than the lead robot's LiDAR.
+
+    `thirdparty_1` stood 0.50 m; AMR-1 scans at 0.600 m, so its beam passed
+    100 mm over the top and the lead robot was blind to it -- while AMR-2 at
+    0.480 m saw it perfectly. That asymmetry is why it looked intermittent
+    rather than broken.
+
+    Derived from the model library, so a new robot with a higher scanner cannot
+    silently outgrow the obstacles it is supposed to avoid.
+    """
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(SRC, 'amr_bringup'))
+    import yaml as _yaml
+
+    with open(os.path.join(SRC, 'amr_description', 'config',
+                           'robot_models.yaml'), 'r', encoding='utf-8') as handle:
+        models = _yaml.safe_load(handle)
+    highest = max(float(m['lidar']['height']) for m in models.values())
+
+    for obstacle in spec.dynamics:
+        if obstacle.shape == 'human':
+            continue          # covered by the bone-collision column instead
+        assert obstacle.height >= highest, (
+            f'{obstacle.name} is {obstacle.height} m tall but the highest scan '
+            f'plane in the fleet is {highest} m. Any robot scanning above the '
+            f'obstacle drives straight through it.'
+        )

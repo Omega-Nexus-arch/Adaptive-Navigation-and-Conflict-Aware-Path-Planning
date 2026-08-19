@@ -46,6 +46,15 @@ HUMAN_TURN_SECONDS = 0.7
 #: work and the hips fill in the torso. Spheres because a bone's frame is
 #: rotated (the skeleton is Y-up) and a sphere is the one shape that does not
 #: care.
+#: Mass and inertia given to each pedestrian bone link [kg, kg m^2].
+#:
+#: Nominal. The actor is kinematic -- Gazebo drives it from the animation, not
+#: from forces -- so these values never accelerate anything. They exist because
+#: a link without an <inertial> is not registered with the physics engine at
+#: all, which is what made the collision spheres invisible to the LiDAR.
+HUMAN_BONE_MASS = 1.0
+HUMAN_BONE_INERTIA = 4e-05
+
 HUMAN_BONE_COLLISIONS = {
     # A continuous column of spheres, not three markers. The AMRs were driving
     # straight through the pedestrians: two 0.22 m knees and one 0.40 m hip
@@ -597,7 +606,11 @@ def build_warehouse() -> WorldSpec:
             # South-east corridor, on the west_staging -> east_staging route
             # used by the slope demo. Was (10, 0)..(16, 5.5), which overlapped
             # the steep ramp corridor.
-            'thirdparty_1', 'box', 0.45, 0.5, 5.5, -5.0,
+            # 0.90 m tall, not 0.50. AMR-1's scan plane is at 0.600 m, so a
+            # half-metre box passed 100 mm UNDER the beam and the lead robot was
+            # blind to it -- while AMR-2 at 0.480 m saw it perfectly, which is
+            # why it looked intermittent rather than broken.
+            'thirdparty_1', 'box', 0.45, 0.9, 5.5, -5.0,
             waypoints=((5.5, -5.0), (13.0, -5.0), (13.0, -7.0), (5.5, -7.0)),
             speed=0.8, material='Gazebo/Red',
         ),
@@ -797,9 +810,35 @@ def _human_actor_sdf(obs: DynamicObstacle) -> str:
         clock += math.hypot(end[0] - start[0], end[1] - start[1]) / obs.speed
         waypoints.append(_actor_waypoint(clock, end, heading_of[index]))
 
+    # A BARE <collision> IS NOT ENOUGH.
+    #
+    # Gazebo Classic will parse an actor link that contains only a <collision>
+    # and then never register it with the physics engine, so the sphere exists
+    # in the SDF and is invisible to every ray sensor -- the AMRs drove straight
+    # through the pedestrians while the world file looked correct.
+    #
+    # The reference warehouse that does work gives every bone link four things:
+    # a <pose>, <gravity>0</gravity>, <self_collide>0</self_collide> and an
+    # <inertial> block. The inertial is the one that matters: without a mass the
+    # link is treated as a pure animation node. Gravity is disabled because the
+    # skeleton is driven by the animation, not by physics, and self-collision is
+    # off so the limbs do not fight each other.
     collisions = '\n'.join(
         f"""      <link name="{bone}">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>{HUMAN_BONE_MASS}</mass>
+          <inertia>
+            <ixx>{HUMAN_BONE_INERTIA}</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>{HUMAN_BONE_INERTIA}</iyy><iyz>0</iyz>
+            <izz>{HUMAN_BONE_INERTIA}</izz>
+          </inertia>
+        </inertial>
         <collision name="{bone}_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>{radius:.3f}</radius></sphere></geometry>
         </collision>
       </link>"""

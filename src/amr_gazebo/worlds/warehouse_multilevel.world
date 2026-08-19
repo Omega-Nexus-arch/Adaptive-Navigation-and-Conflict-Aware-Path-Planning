@@ -1026,42 +1026,146 @@
         </trajectory>
       </script>
       <link name="LeftFoot">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftFoot_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.200</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightFoot">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightFoot_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.200</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LeftLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LeftUpLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftUpLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightUpLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightUpLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="Hips">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="Hips_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.450</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LowerBack">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LowerBack_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.400</radius></sphere></geometry>
         </collision>
       </link>
@@ -1094,42 +1198,146 @@
         </trajectory>
       </script>
       <link name="LeftFoot">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftFoot_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.200</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightFoot">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightFoot_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.200</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LeftLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LeftUpLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftUpLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightUpLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightUpLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="Hips">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="Hips_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.450</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LowerBack">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LowerBack_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.400</radius></sphere></geometry>
         </collision>
       </link>
@@ -1162,42 +1370,146 @@
         </trajectory>
       </script>
       <link name="LeftFoot">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftFoot_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.200</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightFoot">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightFoot_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.200</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LeftLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LeftUpLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftUpLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightUpLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightUpLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="Hips">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="Hips_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.450</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LowerBack">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LowerBack_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.400</radius></sphere></geometry>
         </collision>
       </link>
@@ -1230,63 +1542,167 @@
         </trajectory>
       </script>
       <link name="LeftFoot">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftFoot_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.200</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightFoot">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightFoot_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.200</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LeftLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LeftUpLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LeftUpLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="RightUpLeg">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="RightUpLeg_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.300</radius></sphere></geometry>
         </collision>
       </link>
       <link name="Hips">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="Hips_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.450</radius></sphere></geometry>
         </collision>
       </link>
       <link name="LowerBack">
+        <pose>0 0 0 0 0 0</pose>
+        <gravity>0</gravity>
+        <self_collide>0</self_collide>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1.0</mass>
+          <inertia>
+            <ixx>4e-05</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>4e-05</iyy><iyz>0</iyz>
+            <izz>4e-05</izz>
+          </inertia>
+        </inertial>
         <collision name="LowerBack_collision">
+          <pose>0 0 0 0 0 0</pose>
           <geometry><sphere><radius>0.400</radius></sphere></geometry>
         </collision>
       </link>
     </actor>
 
     <model name="thirdparty_1">
-      <pose>5.5000 -5.0000 0.2500 0 0 0</pose>
+      <pose>5.5000 -5.0000 0.4500 0 0 0</pose>
       <link name="link">
         <inertial>
           <mass>40.00</mass>
           <inertia>
-            <ixx>0.8333</ixx><ixy>0</ixy><ixz>0</ixz>
-            <iyy>0.8333</iyy><iyz>0</iyz>
+            <ixx>2.7000</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>2.7000</iyy><iyz>0</iyz>
             <izz>4.0500</izz>
           </inertia>
         </inertial>
         <collision name="collision">
-          <geometry><box><size>0.900 0.900 0.500</size></box></geometry>
+          <geometry><box><size>0.900 0.900 0.900</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>0.900 0.900 0.500</size></box></geometry>
+          <geometry><box><size>0.900 0.900 0.900</size></box></geometry>
           <material>
             <script>
               <uri>file://media/materials/scripts/gazebo.material</uri>
